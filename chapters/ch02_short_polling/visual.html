@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch02 — Short Polling Visualization</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --cyan: #39d353;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--blue);
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .control-group label {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .control-group .value {
+    color: var(--yellow);
+    font-weight: 600;
+    min-width: 30px;
+  }
+
+  input[type="range"] {
+    width: 140px;
+    accent-color: var(--blue);
+  }
+
+  button {
+    padding: 8px 16px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+
+  button:hover { border-color: var(--blue); color: var(--blue); }
+
+  button.primary {
+    background: var(--blue);
+    color: var(--bg);
+    border-color: var(--blue);
+    font-weight: 600;
+  }
+
+  button.primary:hover { opacity: 0.9; }
+
+  button.danger {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  button.advance {
+    background: var(--green);
+    color: var(--bg);
+    border-color: var(--green);
+    font-weight: 600;
+  }
+
+  button.advance:hover { opacity: 0.9; }
+
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .value {
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .stat-card .unit {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .stat-card.green .value { color: var(--green); }
+  .stat-card.red .value { color: var(--red); }
+  .stat-card.yellow .value { color: var(--yellow); }
+  .stat-card.blue .value { color: var(--blue); }
+  .stat-card.purple .value { color: var(--purple); }
+
+  .main-area {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+  }
+
+  @media (max-width: 900px) {
+    .main-area { grid-template-columns: 1fr; }
+  }
+
+  .timeline-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .timeline-header {
+    display: grid;
+    grid-template-columns: 100px 1fr 100px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .timeline-scroll {
+    height: 500px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+
+  .timeline-scroll::-webkit-scrollbar { width: 6px; }
+  .timeline-scroll::-webkit-scrollbar-track { background: var(--bg); }
+  .timeline-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .poll-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 100px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .poll-row .client-side,
+  .poll-row .server-side {
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .poll-row .arrow-area {
+    position: relative;
+    height: 32px;
+  }
+
+  .arrow-request, .arrow-response {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    animation: flyAcross 0.4s ease;
+  }
+
+  .arrow-request {
+    top: 8px;
+    background: linear-gradient(to right, var(--blue), var(--blue));
+  }
+
+  .arrow-response.wasted {
+    top: 20px;
+    background: linear-gradient(to left, var(--red), var(--red));
+  }
+
+  .arrow-response.useful {
+    top: 20px;
+    background: linear-gradient(to left, var(--green), var(--green));
+  }
+
+  @keyframes flyAcross {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  .arrow-label {
+    position: absolute;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .arrow-label.req {
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--blue);
+  }
+
+  .arrow-label.resp {
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .arrow-label.resp.wasted { color: var(--red); }
+  .arrow-label.resp.useful { color: var(--green); }
+
+  .poll-number {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .order-status {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .order-status h3 {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .status-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all 0.3s;
+  }
+
+  .status-step.active {
+    background: rgba(63, 185, 80, 0.1);
+    color: var(--green);
+    font-weight: 600;
+  }
+
+  .status-step.completed {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+
+  .status-step.active .status-dot {
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(63, 185, 80, 0.5);
+  }
+
+  .status-step.completed .status-dot { background: var(--text-muted); }
+
+  .efficiency-bar-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .efficiency-bar-container h3 {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .eff-bar-track {
+    height: 24px;
+    background: var(--bg);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 8px;
+  }
+
+  .eff-bar-useful {
+    background: var(--green);
+    height: 100%;
+    transition: width 0.3s;
+    min-width: 0;
+  }
+
+  .eff-bar-wasted {
+    background: var(--red);
+    height: 100%;
+    transition: width 0.3s;
+    flex: 1;
+  }
+
+  .eff-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+  }
+
+  .eff-legend .useful-label { color: var(--green); }
+  .eff-legend .wasted-label { color: var(--red); }
+
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    flex: 1;
+    min-height: 150px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .log-panel h3 {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .log-entries {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .log-entries::-webkit-scrollbar { width: 4px; }
+  .log-entries::-webkit-scrollbar-track { background: var(--bg); }
+  .log-entries::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-entry { color: var(--text-muted); }
+  .log-entry.useful { color: var(--green); }
+  .log-entry.wasted { color: var(--red); }
+  .log-entry.info { color: var(--blue); }
+  .log-entry.advance { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Ch02 — Short Polling Visualization</h1>
+<p class="subtitle">Watch the waste accumulate as the client asks "anything new?" every N seconds</p>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Poll interval:</label>
+    <input type="range" id="intervalSlider" min="1" max="10" step="0.5" value="2">
+    <span class="value" id="intervalDisplay">2.0s</span>
+  </div>
+  <button class="primary" id="startBtn">Start Polling</button>
+  <button class="danger" id="stopBtn" disabled>Stop</button>
+  <button class="advance" id="advanceBtn" disabled>Advance Order Status</button>
+  <button id="resetBtn">Reset</button>
+</div>
+
+<div class="dashboard">
+  <div class="stat-card blue">
+    <div class="label">Total Requests</div>
+    <div class="value" id="totalRequests">0</div>
+  </div>
+  <div class="stat-card green">
+    <div class="label">Useful</div>
+    <div class="value" id="usefulRequests">0</div>
+  </div>
+  <div class="stat-card red">
+    <div class="label">Wasted</div>
+    <div class="value" id="wastedRequests">0</div>
+  </div>
+  <div class="stat-card yellow">
+    <div class="label">Efficiency</div>
+    <div class="value" id="efficiency">-</div>
+    <div class="unit">%</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="label">Bandwidth</div>
+    <div class="value" id="bandwidth">0</div>
+    <div class="unit" id="bandwidthUnit">B</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="label">Order Status</div>
+    <div class="value" id="currentStatus" style="font-size: 16px;">-</div>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="timeline-container">
+    <div class="timeline-header">
+      <div>Client</div>
+      <div>Network</div>
+      <div>Server</div>
+    </div>
+    <div class="timeline-scroll" id="timelineScroll">
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="order-status">
+      <h3>Order Pipeline</h3>
+      <div class="status-pipeline" id="statusPipeline"></div>
+    </div>
+
+    <div class="efficiency-bar-container">
+      <h3>Useful vs Wasted</h3>
+      <div class="eff-bar-track">
+        <div class="eff-bar-useful" id="effBarUseful" style="width: 0%"></div>
+        <div class="eff-bar-wasted" id="effBarWasted"></div>
+      </div>
+      <div class="eff-legend">
+        <span class="useful-label" id="usefulPct">0% useful</span>
+        <span class="wasted-label" id="wastedPct">0% wasted</span>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <h3>Event Log</h3>
+      <div class="log-entries" id="logEntries"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const STATUSES = [
+  "placed", "confirmed", "preparing", "ready",
+  "picked_up", "en_route", "delivered"
+];
+
+let state = {
+  polling: false,
+  pollTimer: null,
+  statusIndex: 0,
+  totalRequests: 0,
+  usefulRequests: 0,
+  wastedRequests: 0,
+  totalBytes: 0,
+  lastKnownStatus: null,
+  pollCount: 0,
+};
+
+// ---------------------------------------------------------------------------
+// DOM refs
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const intervalSlider = $("intervalSlider");
+const intervalDisplay = $("intervalDisplay");
+const startBtn = $("startBtn");
+const stopBtn = $("stopBtn");
+const advanceBtn = $("advanceBtn");
+const resetBtn = $("resetBtn");
+const timelineScroll = $("timelineScroll");
+const logEntries = $("logEntries");
+
+// ---------------------------------------------------------------------------
+// Status pipeline rendering
+// ---------------------------------------------------------------------------
+function renderPipeline() {
+  const pipeline = $("statusPipeline");
+  pipeline.innerHTML = "";
+  STATUSES.forEach((s, i) => {
+    const step = document.createElement("div");
+    step.className = "status-step";
+    if (i === state.statusIndex) step.classList.add("active");
+    else if (i < state.statusIndex) step.classList.add("completed");
+    step.innerHTML = `<div class="status-dot"></div><span>${s}</span>`;
+    pipeline.appendChild(step);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard updates
+// ---------------------------------------------------------------------------
+function updateDashboard() {
+  $("totalRequests").textContent = state.totalRequests;
+  $("usefulRequests").textContent = state.usefulRequests;
+  $("wastedRequests").textContent = state.wastedRequests;
+
+  const eff = state.totalRequests > 0
+    ? (state.usefulRequests / state.totalRequests * 100).toFixed(1)
+    : "-";
+  $("efficiency").textContent = eff;
+
+  const { value, unit } = humanBytes(state.totalBytes);
+  $("bandwidth").textContent = value;
+  $("bandwidthUnit").textContent = unit;
+
+  $("currentStatus").textContent = STATUSES[state.statusIndex] || "-";
+
+  // Efficiency bar
+  if (state.totalRequests > 0) {
+    const usefulPct = (state.usefulRequests / state.totalRequests * 100);
+    $("effBarUseful").style.width = usefulPct + "%";
+    $("usefulPct").textContent = usefulPct.toFixed(1) + "% useful";
+    $("wastedPct").textContent = (100 - usefulPct).toFixed(1) + "% wasted";
+  }
+}
+
+function humanBytes(n) {
+  const units = ["B", "KB", "MB", "GB"];
+  let idx = 0;
+  let val = n;
+  while (val >= 1024 && idx < units.length - 1) {
+    val /= 1024;
+    idx++;
+  }
+  return { value: val.toFixed(idx === 0 ? 0 : 1), unit: units[idx] };
+}
+
+// ---------------------------------------------------------------------------
+// Logging
+// ---------------------------------------------------------------------------
+function log(msg, cls = "") {
+  const entry = document.createElement("div");
+  entry.className = "log-entry " + cls;
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+  entry.textContent = `[${ts}] ${msg}`;
+  logEntries.appendChild(entry);
+  logEntries.scrollTop = logEntries.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Timeline row
+// ---------------------------------------------------------------------------
+function addTimelineRow(pollNum, status, useful) {
+  const row = document.createElement("div");
+  row.className = "poll-row";
+
+  const cls = useful ? "useful" : "wasted";
+  const respText = useful ? `200 "${status}"` : `200 (same)`;
+
+  row.innerHTML = `
+    <div class="client-side">
+      <span class="poll-number">#${pollNum}</span>
+      <div>GET /orders/...</div>
+    </div>
+    <div class="arrow-area">
+      <div class="arrow-request"></div>
+      <div class="arrow-label req">GET</div>
+      <div class="arrow-response ${cls}"></div>
+      <div class="arrow-label resp ${cls}">${respText}</div>
+    </div>
+    <div class="server-side" style="color: var(--${useful ? 'green' : 'red'});">
+      ${status}
+    </div>
+  `;
+
+  timelineScroll.appendChild(row);
+  timelineScroll.scrollTop = timelineScroll.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Core polling logic
+// ---------------------------------------------------------------------------
+function doPoll() {
+  state.pollCount++;
+  state.totalRequests++;
+
+  const currentStatus = STATUSES[state.statusIndex];
+  const useful = state.lastKnownStatus !== currentStatus;
+
+  // Simulate ~1100 bytes per round trip
+  state.totalBytes += 1100;
+
+  if (useful) {
+    state.usefulRequests++;
+    state.lastKnownStatus = currentStatus;
+    log(`Poll #${state.pollCount}: Status="${currentStatus}" -- CHANGED!`, "useful");
+  } else {
+    state.wastedRequests++;
+    log(`Poll #${state.pollCount}: Status="${currentStatus}" -- no change`, "wasted");
+  }
+
+  addTimelineRow(state.pollCount, currentStatus, useful);
+  updateDashboard();
+}
+
+function startPolling() {
+  if (state.polling) return;
+  state.polling = true;
+  state.lastKnownStatus = null; // First poll is always "useful"
+
+  const intervalMs = parseFloat(intervalSlider.value) * 1000;
+
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  advanceBtn.disabled = false;
+  intervalSlider.disabled = true;
+
+  log(`Polling started: interval = ${intervalSlider.value}s`, "info");
+
+  // Immediate first poll
+  doPoll();
+
+  state.pollTimer = setInterval(() => {
+    if (STATUSES[state.statusIndex] === "delivered") {
+      stopPolling();
+      log("Order delivered. Polling stopped.", "info");
+      return;
+    }
+    doPoll();
+  }, intervalMs);
+}
+
+function stopPolling() {
+  if (!state.polling) return;
+  state.polling = false;
+
+  clearInterval(state.pollTimer);
+  state.pollTimer = null;
+
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  advanceBtn.disabled = true;
+  intervalSlider.disabled = false;
+
+  log("Polling stopped.", "info");
+}
+
+function advanceStatus() {
+  if (state.statusIndex >= STATUSES.length - 1) {
+    log("Already at final status.", "info");
+    return;
+  }
+  const prev = STATUSES[state.statusIndex];
+  state.statusIndex++;
+  const next = STATUSES[state.statusIndex];
+  log(`Status advanced: ${prev} -> ${next}`, "advance");
+  renderPipeline();
+
+  if (next === "delivered") {
+    advanceBtn.disabled = true;
+  }
+}
+
+function resetAll() {
+  stopPolling();
+  state = {
+    polling: false,
+    pollTimer: null,
+    statusIndex: 0,
+    totalRequests: 0,
+    usefulRequests: 0,
+    wastedRequests: 0,
+    totalBytes: 0,
+    lastKnownStatus: null,
+    pollCount: 0,
+  };
+  timelineScroll.innerHTML = "";
+  logEntries.innerHTML = "";
+  renderPipeline();
+  updateDashboard();
+  $("effBarUseful").style.width = "0%";
+  $("usefulPct").textContent = "0% useful";
+  $("wastedPct").textContent = "0% wasted";
+  advanceBtn.disabled = true;
+  log("Reset complete.", "info");
+}
+
+// ---------------------------------------------------------------------------
+// Event listeners
+// ---------------------------------------------------------------------------
+intervalSlider.addEventListener("input", () => {
+  intervalDisplay.textContent = parseFloat(intervalSlider.value).toFixed(1) + "s";
+});
+
+startBtn.addEventListener("click", startPolling);
+stopBtn.addEventListener("click", stopPolling);
+advanceBtn.addEventListener("click", advanceStatus);
+resetBtn.addEventListener("click", resetAll);
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+renderPipeline();
+updateDashboard();
+log("Ready. Click 'Start Polling' to begin.", "info");
+</script>
+</body>
+</html>

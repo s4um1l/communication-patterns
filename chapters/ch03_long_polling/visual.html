@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch03 — Long Polling vs Short Polling Visual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.15);
+    --green-dim: rgba(74, 222, 128, 0.15);
+    --yellow: #fbbf24;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+  }
+
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.green { background: var(--green); color: #000; }
+  .btn.green:hover { background: #3bcc6e; box-shadow: 0 0 16px var(--green-glow); }
+  .btn.orange { background: var(--orange); color: #000; }
+  .btn.orange:hover { background: #e8842e; }
+
+  .status-display {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .status-display .label { color: var(--text-dim); }
+  .status-display .value { color: var(--yellow); font-weight: 600; }
+
+  /* Split layout */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    width: 1000px;
+    max-width: 95vw;
+    margin-bottom: 1.5rem;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .panel-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+  }
+  .badge-short { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+  .badge-long { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+
+  /* Connection visualization */
+  .conn-area {
+    height: 200px;
+    position: relative;
+    background: var(--surface2);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+
+  /* Timeline lanes */
+  .lane-labels {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    z-index: 2;
+  }
+  .lane-labels div { margin-bottom: 54px; }
+
+  .timeline-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-value.red { color: var(--red); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.orange { color: var(--orange); }
+
+  /* Connection state indicator */
+  .conn-state {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    z-index: 2;
+  }
+  .conn-idle { background: rgba(139, 143, 163, 0.15); color: var(--text-dim); border: 1px solid var(--text-dim); }
+  .conn-active { background: rgba(108, 140, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+  .conn-waiting { background: rgba(251, 191, 36, 0.15); color: var(--yellow); border: 1px solid var(--yellow); }
+
+  /* Insight bar */
+  .insight {
+    width: 1000px;
+    max-width: 95vw;
+    background: var(--surface);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0;
+    padding: 0.8rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .insight strong { color: var(--text); }
+
+  /* Event log */
+  .event-log {
+    width: 1000px;
+    max-width: 95vw;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-top: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.6;
+  }
+  .log-entry { padding: 0.1rem 0; }
+  .log-short { color: var(--red); }
+  .log-long { color: var(--green); }
+  .log-system { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Chapter 03 — Short Polling vs Long Polling</h1>
+<p class="subtitle">Watch both strategies track the same order. See the difference in real time.</p>
+
+<div class="controls">
+  <button class="btn green" id="startBtn">Start Demo</button>
+  <button class="btn orange" id="advanceBtn" disabled>Advance Status</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <div class="status-display">
+    <span class="label">Order Status: </span>
+    <span class="value" id="currentStatus">placed</span>
+  </div>
+</div>
+
+<div class="split">
+  <!-- LEFT: Short Polling -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Short Polling</span>
+      <span class="panel-badge badge-short">Every 2 seconds</span>
+    </div>
+    <div class="conn-area" id="shortArea">
+      <div class="lane-labels">
+        <div>CLIENT</div>
+        <div>SERVER</div>
+      </div>
+      <canvas class="timeline-canvas" id="shortCanvas"></canvas>
+      <div class="conn-state conn-idle" id="shortState">IDLE</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-value red" id="shortRequests">0</div>
+        <div class="stat-label">Requests</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value red" id="shortWasted">0</div>
+        <div class="stat-label">Wasted (no change)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value accent" id="shortDetected">0</div>
+        <div class="stat-label">Changes Detected</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value orange" id="shortLatency">--</div>
+        <div class="stat-label">Avg Detect Latency</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Long Polling -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Long Polling</span>
+      <span class="panel-badge badge-long">Server holds connection</span>
+    </div>
+    <div class="conn-area" id="longArea">
+      <div class="lane-labels">
+        <div>CLIENT</div>
+        <div>SERVER</div>
+      </div>
+      <canvas class="timeline-canvas" id="longCanvas"></canvas>
+      <div class="conn-state conn-idle" id="longState">IDLE</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-value green" id="longRequests">0</div>
+        <div class="stat-label">Requests</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value green" id="longWasted">0</div>
+        <div class="stat-label">Timeouts (no change)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value accent" id="longDetected">0</div>
+        <div class="stat-label">Changes Detected</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value orange" id="longLatency">--</div>
+        <div class="stat-label">Avg Detect Latency</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>What to watch for:</strong> The short poller (left) fires requests constantly — most come back red (no change).
+  The long poller (right) holds a single connection open (shown as a dashed line). When you click "Advance Status,"
+  the short poller won't notice until its next tick (~1s avg delay). The long poller gets notified <strong>instantly</strong>
+  because the server was already holding its request, waiting for exactly this moment.
+</div>
+
+<div class="event-log" id="eventLog"></div>
+
+<script>
+(function() {
+  // ---- State ----
+  const STATUSES = ['placed', 'confirmed', 'preparing', 'ready', 'picked_up', 'en_route', 'delivered'];
+  let currentStatusIdx = 0;
+  let running = false;
+  let startTime = 0;
+
+  // Short poll state
+  let shortTimer = null;
+  let shortRequests = 0;
+  let shortWasted = 0;
+  let shortDetected = 0;
+  let shortLastKnown = 'placed';
+  let shortDetectLatencies = [];
+  let shortEvents = []; // {time, type: 'request'|'response', changed: bool}
+
+  // Long poll state
+  let longRequests = 0;
+  let longWasted = 0;
+  let longDetected = 0;
+  let longLastKnown = 'placed';
+  let longDetectLatencies = [];
+  let longEvents = []; // {time, type, ...}
+  let longWaiting = false;
+  let longWaitStart = 0;
+  let longTimeout = null;
+  let longPollTimer = null;
+
+  // Change tracking
+  let lastChangeTime = 0;
+
+  // ---- Elements ----
+  const startBtn = document.getElementById('startBtn');
+  const advanceBtn = document.getElementById('advanceBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const currentStatusEl = document.getElementById('currentStatus');
+  const shortCanvas = document.getElementById('shortCanvas');
+  const longCanvas = document.getElementById('longCanvas');
+  const shortStateEl = document.getElementById('shortState');
+  const longStateEl = document.getElementById('longState');
+  const eventLogEl = document.getElementById('eventLog');
+
+  const shortRequestsEl = document.getElementById('shortRequests');
+  const shortWastedEl = document.getElementById('shortWasted');
+  const shortDetectedEl = document.getElementById('shortDetected');
+  const shortLatencyEl = document.getElementById('shortLatency');
+  const longRequestsEl = document.getElementById('longRequests');
+  const longWastedEl = document.getElementById('longWasted');
+  const longDetectedEl = document.getElementById('longDetected');
+  const longLatencyEl = document.getElementById('longLatency');
+
+  // ---- Canvas setup ----
+  function setupCanvas(canvas) {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+    return ctx;
+  }
+
+  let shortCtx, longCtx;
+  function initCanvases() {
+    shortCtx = setupCanvas(shortCanvas);
+    longCtx = setupCanvas(longCanvas);
+  }
+  initCanvases();
+  window.addEventListener('resize', initCanvases);
+
+  // ---- Logging ----
+  function log(cls, msg) {
+    const el = document.createElement('div');
+    el.className = 'log-entry ' + cls;
+    const t = running ? ((Date.now() - startTime) / 1000).toFixed(1) : '0.0';
+    el.textContent = `[${t}s] ${msg}`;
+    eventLogEl.prepend(el);
+    if (eventLogEl.children.length > 100) eventLogEl.lastChild.remove();
+  }
+
+  // ---- Drawing ----
+  const CANVAS_DURATION = 20; // seconds visible in the timeline
+  const CLIENT_Y = 40;
+  const SERVER_Y = 140;
+
+  function elapsed() {
+    return (Date.now() - startTime) / 1000;
+  }
+
+  function timeToX(ctx, t, now) {
+    const w = ctx.canvas.width / 2;
+    const margin = 60;
+    const usable = w - margin;
+    const offset = now - CANVAS_DURATION;
+    return margin + ((t - offset) / CANVAS_DURATION) * usable;
+  }
+
+  function drawTimeline(ctx, events, isLong) {
+    const w = ctx.canvas.width / 2;
+    const h = ctx.canvas.height / 2;
+    ctx.clearRect(0, 0, w, h);
+
+    const now = elapsed();
+
+    // Background lanes
+    ctx.fillStyle = 'rgba(46, 51, 71, 0.5)';
+    ctx.fillRect(0, CLIENT_Y - 15, w, 30);
+    ctx.fillRect(0, SERVER_Y - 15, w, 30);
+
+    // Draw events
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      const x = timeToX(ctx, ev.time, now);
+      if (x < 30 || x > w + 20) continue;
+
+      if (ev.type === 'request') {
+        // Arrow from client to server
+        ctx.strokeStyle = 'rgba(108, 140, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, CLIENT_Y);
+        ctx.lineTo(x, SERVER_Y);
+        ctx.stroke();
+
+        // Arrowhead
+        ctx.fillStyle = 'rgba(108, 140, 255, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(x, SERVER_Y);
+        ctx.lineTo(x - 4, SERVER_Y - 8);
+        ctx.lineTo(x + 4, SERVER_Y - 8);
+        ctx.fill();
+      }
+
+      if (ev.type === 'response') {
+        const color = ev.changed
+          ? 'rgba(74, 222, 128, 0.9)'
+          : 'rgba(248, 113, 113, 0.5)';
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = ev.changed ? 2.5 : 1.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, SERVER_Y);
+        ctx.lineTo(x, CLIENT_Y);
+        ctx.stroke();
+
+        // Arrowhead
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, CLIENT_Y);
+        ctx.lineTo(x - 4, CLIENT_Y + 8);
+        ctx.lineTo(x + 4, CLIENT_Y + 8);
+        ctx.fill();
+
+        // Dot for changed
+        if (ev.changed) {
+          ctx.beginPath();
+          ctx.arc(x, CLIENT_Y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(74, 222, 128, 0.9)';
+          ctx.fill();
+        }
+      }
+
+      if (ev.type === 'hold-start' && isLong) {
+        // Find matching hold-end or use current time
+        let endTime = now;
+        for (let j = i + 1; j < events.length; j++) {
+          if (events[j].type === 'hold-end' || events[j].type === 'response') {
+            endTime = events[j].time;
+            break;
+          }
+        }
+        const x2 = timeToX(ctx, endTime, now);
+
+        // Dashed line showing held connection
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, (CLIENT_Y + SERVER_Y) / 2);
+        ctx.lineTo(Math.min(x2, timeToX(ctx, now, now)), (CLIENT_Y + SERVER_Y) / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // "HOLDING" label
+        const midX = (x + Math.min(x2, timeToX(ctx, now, now))) / 2;
+        if (midX > 70 && midX < w - 30) {
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
+          ctx.font = '9px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('HOLDING', midX, (CLIENT_Y + SERVER_Y) / 2 - 8);
+        }
+      }
+    }
+
+    // If long polling is currently waiting, draw live hold line
+    if (isLong && longWaiting) {
+      const holdX = timeToX(ctx, (longWaitStart - startTime) / 1000, now);
+      const nowX = timeToX(ctx, now, now);
+      if (holdX < w) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(Math.max(holdX, 60), (CLIENT_Y + SERVER_Y) / 2);
+        ctx.lineTo(nowX, (CLIENT_Y + SERVER_Y) / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ---- Animation loop ----
+  let animFrame;
+  function render() {
+    if (!running) return;
+    drawTimeline(shortCtx, shortEvents, false);
+    drawTimeline(longCtx, longEvents, true);
+    animFrame = requestAnimationFrame(render);
+  }
+
+  // ---- Short polling logic ----
+  function shortPoll() {
+    if (!running) return;
+    const now = elapsed();
+    shortRequests++;
+    shortRequestsEl.textContent = shortRequests;
+
+    shortEvents.push({ time: now, type: 'request' });
+
+    shortStateEl.className = 'conn-state conn-active';
+    shortStateEl.textContent = 'REQUESTING';
+
+    // Simulate network delay (100-200ms)
+    const delay = 100 + Math.random() * 100;
+
+    setTimeout(() => {
+      if (!running) return;
+      const respTime = elapsed();
+      const currentStatus = STATUSES[currentStatusIdx];
+      const changed = currentStatus !== shortLastKnown;
+
+      shortEvents.push({ time: respTime, type: 'response', changed });
+
+      if (changed) {
+        shortDetected++;
+        shortDetectedEl.textContent = shortDetected;
+        const latency = Date.now() - lastChangeTime;
+        shortDetectLatencies.push(latency);
+        const avg = shortDetectLatencies.reduce((a, b) => a + b, 0) / shortDetectLatencies.length;
+        shortLatencyEl.textContent = Math.round(avg) + 'ms';
+        shortLastKnown = currentStatus;
+        log('log-short', `SHORT: Detected change -> "${currentStatus}" (latency: ${latency}ms)`);
+      } else {
+        shortWasted++;
+        shortWastedEl.textContent = shortWasted;
+      }
+
+      shortStateEl.className = 'conn-state conn-idle';
+      shortStateEl.textContent = 'IDLE';
+    }, delay);
+  }
+
+  function startShortPolling() {
+    shortPoll();
+    shortTimer = setInterval(shortPoll, 2000);
+  }
+
+  // ---- Long polling logic ----
+  function longPoll() {
+    if (!running) return;
+    const now = elapsed();
+    longRequests++;
+    longRequestsEl.textContent = longRequests;
+
+    longEvents.push({ time: now, type: 'request' });
+
+    // Simulate request arriving at server (50ms)
+    setTimeout(() => {
+      if (!running) return;
+
+      const currentStatus = STATUSES[currentStatusIdx];
+      if (currentStatus !== longLastKnown) {
+        // Status already changed — respond immediately
+        const respTime = elapsed();
+        longEvents.push({ time: respTime, type: 'response', changed: true });
+
+        longDetected++;
+        longDetectedEl.textContent = longDetected;
+        const latency = Date.now() - lastChangeTime;
+        longDetectLatencies.push(latency);
+        const avg = longDetectLatencies.reduce((a, b) => a + b, 0) / longDetectLatencies.length;
+        longLatencyEl.textContent = Math.round(avg) + 'ms';
+        longLastKnown = currentStatus;
+        log('log-long', `LONG: Detected change -> "${currentStatus}" (latency: ${latency}ms)`);
+
+        longStateEl.className = 'conn-state conn-idle';
+        longStateEl.textContent = 'IDLE';
+
+        // Immediately reconnect
+        setTimeout(() => longPoll(), 100);
+        return;
+      }
+
+      // No change — hold the connection
+      longWaiting = true;
+      longWaitStart = Date.now();
+      longEvents.push({ time: elapsed(), type: 'hold-start' });
+
+      longStateEl.className = 'conn-state conn-waiting';
+      longStateEl.textContent = 'WAITING (held open)';
+
+      // Set a timeout (simulating the server-side timeout)
+      longTimeout = setTimeout(() => {
+        if (!running || !longWaiting) return;
+        longWaiting = false;
+
+        const respTime = elapsed();
+        longEvents.push({ time: respTime, type: 'hold-end' });
+        longEvents.push({ time: respTime, type: 'response', changed: false });
+
+        longWasted++;
+        longWastedEl.textContent = longWasted;
+
+        longStateEl.className = 'conn-state conn-idle';
+        longStateEl.textContent = 'TIMEOUT - reconnecting';
+
+        log('log-long', 'LONG: Timeout (no change) - reconnecting');
+
+        // Immediately reconnect
+        setTimeout(() => longPoll(), 100);
+      }, 10000); // 10s timeout for demo
+    }, 50);
+  }
+
+  // Called when status advances — notify the long poller
+  function notifyLongPoller() {
+    if (!longWaiting) return;
+    longWaiting = false;
+
+    if (longTimeout) {
+      clearTimeout(longTimeout);
+      longTimeout = null;
+    }
+
+    const respTime = elapsed();
+    longEvents.push({ time: respTime, type: 'hold-end' });
+
+    // Small delay to simulate server processing + network
+    setTimeout(() => {
+      if (!running) return;
+
+      const t = elapsed();
+      longEvents.push({ time: t, type: 'response', changed: true });
+
+      longDetected++;
+      longDetectedEl.textContent = longDetected;
+      const currentStatus = STATUSES[currentStatusIdx];
+      const latency = Date.now() - lastChangeTime;
+      longDetectLatencies.push(latency);
+      const avg = longDetectLatencies.reduce((a, b) => a + b, 0) / longDetectLatencies.length;
+      longLatencyEl.textContent = Math.round(avg) + 'ms';
+      longLastKnown = currentStatus;
+
+      log('log-long', `LONG: INSTANT notification -> "${currentStatus}" (latency: ${latency}ms)`);
+
+      longStateEl.className = 'conn-state conn-idle';
+      longStateEl.textContent = 'IDLE';
+
+      // Immediately reconnect
+      setTimeout(() => longPoll(), 100);
+    }, 30); // ~30ms = near-instant
+  }
+
+  // ---- Advance Status ----
+  function advanceStatus() {
+    if (currentStatusIdx >= STATUSES.length - 1) return;
+    currentStatusIdx++;
+    const newStatus = STATUSES[currentStatusIdx];
+    currentStatusEl.textContent = newStatus;
+    lastChangeTime = Date.now();
+
+    log('log-system', `STATUS CHANGED -> "${newStatus}"`);
+
+    // Notify the long poller immediately
+    notifyLongPoller();
+
+    if (currentStatusIdx >= STATUSES.length - 1) {
+      advanceBtn.disabled = true;
+    }
+  }
+
+  // ---- Start / Reset ----
+  function start() {
+    if (running) return;
+    running = true;
+    startTime = Date.now();
+    lastChangeTime = Date.now();
+
+    startBtn.disabled = true;
+    advanceBtn.disabled = false;
+
+    log('log-system', 'Demo started. Click "Advance Status" to trigger changes.');
+
+    startShortPolling();
+    longPoll();
+    render();
+  }
+
+  function reset() {
+    running = false;
+    if (shortTimer) clearInterval(shortTimer);
+    if (longTimeout) clearTimeout(longTimeout);
+    if (animFrame) cancelAnimationFrame(animFrame);
+
+    currentStatusIdx = 0;
+    currentStatusEl.textContent = 'placed';
+    shortRequests = 0; shortWasted = 0; shortDetected = 0;
+    shortLastKnown = 'placed'; shortDetectLatencies = [];
+    shortEvents = [];
+    longRequests = 0; longWasted = 0; longDetected = 0;
+    longLastKnown = 'placed'; longDetectLatencies = [];
+    longEvents = []; longWaiting = false;
+
+    shortRequestsEl.textContent = '0';
+    shortWastedEl.textContent = '0';
+    shortDetectedEl.textContent = '0';
+    shortLatencyEl.textContent = '--';
+    longRequestsEl.textContent = '0';
+    longWastedEl.textContent = '0';
+    longDetectedEl.textContent = '0';
+    longLatencyEl.textContent = '--';
+
+    shortStateEl.className = 'conn-state conn-idle';
+    shortStateEl.textContent = 'IDLE';
+    longStateEl.className = 'conn-state conn-idle';
+    longStateEl.textContent = 'IDLE';
+
+    startBtn.disabled = false;
+    advanceBtn.disabled = true;
+
+    // Clear canvases
+    if (shortCtx) shortCtx.clearRect(0, 0, shortCanvas.width, shortCanvas.height);
+    if (longCtx) longCtx.clearRect(0, 0, longCanvas.width, longCanvas.height);
+
+    eventLogEl.innerHTML = '';
+    log('log-system', 'Reset. Click "Start Demo" to begin.');
+  }
+
+  startBtn.addEventListener('click', start);
+  advanceBtn.addEventListener('click', advanceStatus);
+  resetBtn.addEventListener('click', reset);
+
+  log('log-system', 'Ready. Click "Start Demo" to begin, then "Advance Status" to trigger changes.');
+})();
+</script>
+</body>
+</html>
