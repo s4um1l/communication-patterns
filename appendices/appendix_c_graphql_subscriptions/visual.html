@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appendix C — GraphQL Subscriptions Visual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --orange-glow: rgba(251, 146, 60, 0.3);
+    --red: #f87171;
+    --purple: #a78bfa;
+    --purple-glow: rgba(167, 139, 250, 0.3);
+    --cyan: #22d3ee;
+    --cyan-glow: rgba(34, 211, 238, 0.3);
+    --pink: #f472b6;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    width: 960px;
+    max-width: 95vw;
+  }
+
+  .section {
+    width: 960px;
+    max-width: 95vw;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section h3 {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.green { background: #22c55e; }
+  .btn.green:hover { background: #16a34a; box-shadow: 0 0 16px var(--green-glow); }
+  .btn.purple { background: #7c3aed; }
+  .btn.purple:hover { background: #6d28d9; box-shadow: 0 0 16px var(--purple-glow); }
+  .btn.orange { background: #ea580c; }
+  .btn.orange:hover { background: #c2410c; box-shadow: 0 0 16px var(--orange-glow); }
+
+  .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+
+  /* ── Split comparison ── */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .split-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    position: relative;
+  }
+  .split-panel h4 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+  .split-panel.rest h4 { color: var(--orange); }
+  .split-panel.graphql h4 { color: var(--purple); }
+
+  /* ── Request arrows ── */
+  .request-log {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.8;
+    min-height: 160px;
+  }
+  .request-line {
+    opacity: 0;
+    transition: opacity 0.4s;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .request-line.visible { opacity: 1; }
+  .request-line.sending { background: rgba(108, 140, 255, 0.1); }
+  .request-line.receiving { background: rgba(74, 222, 128, 0.08); }
+  .req-arrow { color: var(--orange); }
+  .resp-arrow { color: var(--green); }
+  .gql-arrow { color: var(--purple); }
+  .dim { color: var(--text-dim); }
+
+  /* ── Size bars ── */
+  .size-bar-container {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .size-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+  }
+  .size-bar-label {
+    width: 100px;
+    text-align: right;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .size-bar {
+    height: 22px;
+    border-radius: 4px;
+    transition: width 0.8s ease-out;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: #fff;
+    min-width: 0;
+  }
+  .size-bar.rest-bar { background: linear-gradient(90deg, var(--orange), #f59e0b); }
+  .size-bar.graphql-bar { background: linear-gradient(90deg, var(--purple), #8b5cf6); }
+
+  /* ── Subscription stream ── */
+  .subscription-area {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+  .ws-connection {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+  }
+  .ws-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+  .ws-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+  .ws-dot.disconnected { background: var(--red); }
+
+  .event-stream {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 2;
+    min-height: 200px;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  .event-line {
+    padding: 2px 8px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  .event-line.visible { opacity: 1; }
+  .event-line.protocol { color: var(--cyan); background: rgba(34, 211, 238, 0.06); }
+  .event-line.data-event { color: var(--green); background: rgba(74, 222, 128, 0.06); }
+  .event-line.complete-event { color: var(--text-dim); background: rgba(139, 143, 163, 0.06); }
+
+  /* ── Query builder ── */
+  .query-builder {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.5rem;
+  }
+  .field-picker {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .field-picker h4 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+  .field-group {
+    margin-bottom: 0.5rem;
+  }
+  .field-group-label {
+    font-size: 0.75rem;
+    color: var(--purple);
+    font-family: var(--font-mono);
+    margin-bottom: 0.25rem;
+    margin-left: 0.25rem;
+  }
+  .field-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .field-check:hover { background: rgba(108, 140, 255, 0.1); }
+  .field-check input[type="checkbox"] {
+    accent-color: var(--purple);
+    cursor: pointer;
+  }
+  .field-check.nested { margin-left: 1.25rem; }
+
+  .query-preview {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .query-preview h4 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+  .query-code {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--purple);
+    background: var(--bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    flex: 1;
+    white-space: pre;
+    overflow-x: auto;
+    min-height: 120px;
+  }
+  .response-preview {
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--green);
+    background: var(--bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    white-space: pre;
+    overflow-x: auto;
+    min-height: 80px;
+  }
+  .size-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    margin-top: 0.5rem;
+  }
+  .size-badge.gql { background: rgba(167, 139, 250, 0.2); color: var(--purple); }
+  .size-badge.rest { background: rgba(251, 146, 60, 0.2); color: var(--orange); }
+
+  /* ── Response size chart ── */
+  .chart-area {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .chart-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+  .chart-label {
+    width: 160px;
+    text-align: right;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+  }
+  .chart-bar {
+    height: 18px;
+    border-radius: 3px;
+    transition: width 0.6s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 6px;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: #fff;
+  }
+
+  @media (max-width: 768px) {
+    .split { grid-template-columns: 1fr; }
+    .query-builder { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Appendix C — GraphQL Subscriptions</h1>
+<p class="subtitle">How GraphQL remixes request-response (Ch01) and WebSockets (Ch05) with a typed schema</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Section 1: REST vs GraphQL Comparison -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>REST vs GraphQL: Fetching Order + Driver + Restaurant</h2>
+
+<div class="section">
+  <h3>The N+1 Problem — 3 REST Requests vs 1 GraphQL Query</h3>
+  <div class="controls">
+    <button class="btn orange" id="btn-run-rest" onclick="runRestDemo()">Run REST Requests</button>
+    <button class="btn purple" id="btn-run-graphql" onclick="runGraphQLDemo()">Run GraphQL Query</button>
+    <button class="btn" onclick="resetComparison()">Reset</button>
+  </div>
+
+  <div class="split">
+    <!-- REST Panel -->
+    <div class="split-panel rest">
+      <h4>REST — 3 Sequential Requests</h4>
+      <div class="request-log" id="rest-log">
+        <div class="request-line" id="rest-1">
+          <span class="req-arrow">--></span> GET /api/orders/ord_a1b2
+        </div>
+        <div class="request-line" id="rest-1r">
+          <span class="resp-arrow"><--</span> <span class="dim">200 OK (order object: 487 bytes)</span>
+        </div>
+        <div class="request-line" id="rest-2">
+          <span class="req-arrow">--></span> GET /api/drivers/drv_07
+        </div>
+        <div class="request-line" id="rest-2r">
+          <span class="resp-arrow"><--</span> <span class="dim">200 OK (driver object: 142 bytes)</span>
+        </div>
+        <div class="request-line" id="rest-3">
+          <span class="req-arrow">--></span> GET /api/restaurants/rest_01
+        </div>
+        <div class="request-line" id="rest-3r">
+          <span class="resp-arrow"><--</span> <span class="dim">200 OK (restaurant object: 384 bytes)</span>
+        </div>
+      </div>
+      <div class="size-bar-container">
+        <div class="size-bar-row">
+          <span class="size-bar-label">Total bytes</span>
+          <div class="size-bar rest-bar" id="rest-bar" style="width: 0px;">1,013 B</div>
+        </div>
+        <div class="size-bar-row">
+          <span class="size-bar-label">Round trips</span>
+          <span id="rest-trips" style="color: var(--orange); font-family: var(--font-mono); font-size: 0.8rem;">—</span>
+        </div>
+        <div class="size-bar-row">
+          <span class="size-bar-label">Time</span>
+          <span id="rest-time" style="color: var(--orange); font-family: var(--font-mono); font-size: 0.8rem;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GraphQL Panel -->
+    <div class="split-panel graphql">
+      <h4>GraphQL — 1 Query, Exact Fields</h4>
+      <div class="request-log" id="graphql-log">
+        <div class="request-line" id="gql-1">
+          <span class="gql-arrow">--></span> POST /graphql
+        </div>
+        <div class="request-line" id="gql-1q" style="margin-left: 1rem;">
+          <span class="dim">query { order(id: "ord_a1b2") {</span>
+        </div>
+        <div class="request-line" id="gql-1q2" style="margin-left: 2rem;">
+          <span class="dim">status</span>
+        </div>
+        <div class="request-line" id="gql-1q3" style="margin-left: 2rem;">
+          <span class="dim">driver { name, latitude, longitude }</span>
+        </div>
+        <div class="request-line" id="gql-1q4" style="margin-left: 2rem;">
+          <span class="dim">restaurant { phone }</span>
+        </div>
+        <div class="request-line" id="gql-1q5" style="margin-left: 1rem;">
+          <span class="dim">} }</span>
+        </div>
+        <div class="request-line" id="gql-1r">
+          <span class="resp-arrow"><--</span> <span class="dim">200 OK (exact fields: 148 bytes)</span>
+        </div>
+      </div>
+      <div class="size-bar-container">
+        <div class="size-bar-row">
+          <span class="size-bar-label">Total bytes</span>
+          <div class="size-bar graphql-bar" id="gql-bar" style="width: 0px;">148 B</div>
+        </div>
+        <div class="size-bar-row">
+          <span class="size-bar-label">Round trips</span>
+          <span id="gql-trips" style="color: var(--purple); font-family: var(--font-mono); font-size: 0.8rem;">—</span>
+        </div>
+        <div class="size-bar-row">
+          <span class="size-bar-label">Time</span>
+          <span id="gql-time" style="color: var(--purple); font-family: var(--font-mono); font-size: 0.8rem;">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Section 2: Subscription Stream -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>GraphQL Subscription: Live Order Tracking</h2>
+
+<div class="section">
+  <h3>WebSocket Connection with Typed Events (graphql-ws protocol)</h3>
+  <div class="controls">
+    <button class="btn green" id="btn-subscribe" onclick="runSubscription()">Start Subscription</button>
+    <button class="btn" onclick="resetSubscription()">Reset</button>
+  </div>
+
+  <div class="subscription-area">
+    <div class="ws-connection">
+      <div class="ws-dot" id="ws-dot"></div>
+      <span id="ws-status" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">Disconnected</span>
+    </div>
+    <div class="event-stream" id="event-stream"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Section 3: Query Builder -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Interactive Query Builder: See the Payload Difference</h2>
+
+<div class="section">
+  <h3>Check fields to include — watch the query and response size change</h3>
+
+  <div class="query-builder">
+    <!-- Field Picker -->
+    <div class="field-picker">
+      <h4>Select Fields</h4>
+
+      <div class="field-group">
+        <div class="field-group-label">Order</div>
+        <label class="field-check"><input type="checkbox" checked data-field="id" onchange="updateQuery()"> id</label>
+        <label class="field-check"><input type="checkbox" checked data-field="status" onchange="updateQuery()"> status</label>
+        <label class="field-check"><input type="checkbox" data-field="totalCents" onchange="updateQuery()"> totalCents</label>
+        <label class="field-check"><input type="checkbox" data-field="createdAt" onchange="updateQuery()"> createdAt</label>
+        <label class="field-check"><input type="checkbox" data-field="updatedAt" onchange="updateQuery()"> updatedAt</label>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-label">Order.customer</div>
+        <label class="field-check nested"><input type="checkbox" data-field="customer.id" onchange="updateQuery()"> id</label>
+        <label class="field-check nested"><input type="checkbox" data-field="customer.name" onchange="updateQuery()"> name</label>
+        <label class="field-check nested"><input type="checkbox" data-field="customer.address" onchange="updateQuery()"> address</label>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-label">Order.driver</div>
+        <label class="field-check nested"><input type="checkbox" data-field="driver.name" onchange="updateQuery()"> name</label>
+        <label class="field-check nested"><input type="checkbox" data-field="driver.latitude" onchange="updateQuery()"> latitude</label>
+        <label class="field-check nested"><input type="checkbox" data-field="driver.longitude" onchange="updateQuery()"> longitude</label>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-label">Order.restaurant</div>
+        <label class="field-check nested"><input type="checkbox" data-field="restaurant.name" onchange="updateQuery()"> name</label>
+        <label class="field-check nested"><input type="checkbox" data-field="restaurant.phone" onchange="updateQuery()"> phone</label>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-label">Order.items[]</div>
+        <label class="field-check nested"><input type="checkbox" data-field="items.menuItem.name" onchange="updateQuery()"> menuItem.name</label>
+        <label class="field-check nested"><input type="checkbox" data-field="items.menuItem.priceCents" onchange="updateQuery()"> menuItem.priceCents</label>
+        <label class="field-check nested"><input type="checkbox" data-field="items.quantity" onchange="updateQuery()"> quantity</label>
+      </div>
+    </div>
+
+    <!-- Query + Response Preview -->
+    <div class="query-preview">
+      <h4>Generated Query</h4>
+      <div class="query-code" id="query-code"></div>
+      <h4 style="margin-top: 0.75rem;">Response</h4>
+      <div class="response-preview" id="response-preview"></div>
+      <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+        <span class="size-badge gql" id="gql-size-badge">GraphQL: — bytes</span>
+        <span class="size-badge rest" id="rest-size-badge">REST (full): 847 bytes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Size comparison chart -->
+  <div class="chart-area">
+    <h3 style="margin-bottom: 0.75rem;">Response Size Comparison</h3>
+    <div class="chart-row">
+      <span class="chart-label">REST (full object)</span>
+      <div class="chart-bar" id="chart-rest" style="width: 100%; max-width: 500px; background: linear-gradient(90deg, var(--orange), #f59e0b);">847 B</div>
+    </div>
+    <div class="chart-row">
+      <span class="chart-label">GraphQL (selected)</span>
+      <div class="chart-bar" id="chart-gql" style="width: 50px; background: linear-gradient(90deg, var(--purple), #8b5cf6);">— B</div>
+    </div>
+    <div class="chart-row">
+      <span class="chart-label">Reduction</span>
+      <span id="chart-reduction" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--green);">—</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// Sample Data — mirrors shared/models.py
+// ═══════════════════════════════════════════════════════════════════
+
+const FULL_ORDER = {
+  id: "ord_a1b2",
+  status: "en_route",
+  totalCents: 2197,
+  createdAt: 1700000000.0,
+  updatedAt: 1700003600.0,
+  customer: { id: "cust_01", name: "Alice", address: "742 Evergreen Terrace" },
+  driver: { id: "drv_07", name: "Bob", latitude: 37.7749, longitude: -122.4194, available: false },
+  restaurant: { id: "rest_01", name: "Bob's Burgers", phone: "(555) 123-4567", menu: [] },
+  items: [
+    { menuItem: { id: "item_01", name: "Classic Burger", priceCents: 899, description: "Angus beef patty" }, quantity: 2 },
+    { menuItem: { id: "item_02", name: "Fries", priceCents: 399, description: "Crispy golden fries" }, quantity: 1 }
+  ]
+};
+
+const REST_FULL_SIZE = JSON.stringify(FULL_ORDER).length;
+
+// ═══════════════════════════════════════════════════════════════════
+// Section 1: REST vs GraphQL Comparison Animation
+// ═══════════════════════════════════════════════════════════════════
+
+let restRunning = false;
+let gqlRunning = false;
+
+function showLine(id, delay) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.add('visible'); el.classList.add('sending'); }
+      resolve();
+    }, delay);
+  });
+}
+
+async function runRestDemo() {
+  if (restRunning) return;
+  restRunning = true;
+  document.getElementById('btn-run-rest').disabled = true;
+
+  const steps = ['rest-1','rest-1r','rest-2','rest-2r','rest-3','rest-3r'];
+  for (let i = 0; i < steps.length; i++) {
+    await showLine(steps[i], 400);
+  }
+
+  // Show totals
+  document.getElementById('rest-bar').style.width = '100%';
+  document.getElementById('rest-trips').textContent = '3 round trips';
+  document.getElementById('rest-time').textContent = '~150ms (3 x 50ms RTT)';
+
+  restRunning = false;
+  document.getElementById('btn-run-rest').disabled = false;
+}
+
+async function runGraphQLDemo() {
+  if (gqlRunning) return;
+  gqlRunning = true;
+  document.getElementById('btn-run-graphql').disabled = true;
+
+  const steps = ['gql-1','gql-1q','gql-1q2','gql-1q3','gql-1q4','gql-1q5','gql-1r'];
+  for (let i = 0; i < steps.length; i++) {
+    await showLine(steps[i], i < 6 ? 150 : 500);
+  }
+
+  // Show totals
+  const maxW = document.getElementById('rest-bar').parentElement.offsetWidth - 120;
+  document.getElementById('gql-bar').style.width = Math.max(40, (148 / 1013) * maxW) + 'px';
+  document.getElementById('gql-trips').textContent = '1 round trip';
+  document.getElementById('gql-time').textContent = '~50ms (1 x 50ms RTT)';
+
+  gqlRunning = false;
+  document.getElementById('btn-run-graphql').disabled = false;
+}
+
+function resetComparison() {
+  const lines = document.querySelectorAll('.request-line');
+  lines.forEach(l => { l.classList.remove('visible', 'sending', 'receiving'); });
+  document.getElementById('rest-bar').style.width = '0px';
+  document.getElementById('gql-bar').style.width = '0px';
+  ['rest-trips','rest-time','gql-trips','gql-time'].forEach(id => {
+    document.getElementById(id).textContent = '\u2014';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Section 2: Subscription Stream Animation
+// ═══════════════════════════════════════════════════════════════════
+
+const SUBSCRIPTION_EVENTS = [
+  { type: 'protocol', dir: 'Client \u2192 Server', msg: 'connection_init { auth_token: "Bearer eyJhbG..." }' },
+  { type: 'protocol', dir: 'Server \u2192 Client', msg: 'connection_ack { }' },
+  { type: 'protocol', dir: 'Client \u2192 Server', msg: 'subscribe { id: "1", query: "subscription { orderUpdated(orderId: \\"ord_a1b2\\") { status driver { name } } }" }' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "placed", driver: null } } }', status: 'placed' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "confirmed", driver: null } } }', status: 'confirmed' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "preparing", driver: null } } }', status: 'preparing' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "ready", driver: null } } }', status: 'ready' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "picked_up", driver: { name: "Bob" } } } }', status: 'picked_up' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "en_route", driver: { name: "Bob" } } } }', status: 'en_route' },
+  { type: 'data', dir: 'Server \u2192 Client', msg: 'next { id: "1", data: { orderUpdated: { status: "delivered", driver: { name: "Bob" } } } }', status: 'delivered' },
+  { type: 'complete', dir: 'Server \u2192 Client', msg: 'complete { id: "1" }' },
+];
+
+let subRunning = false;
+
+async function runSubscription() {
+  if (subRunning) return;
+  subRunning = true;
+  document.getElementById('btn-subscribe').disabled = true;
+
+  const stream = document.getElementById('event-stream');
+  const dot = document.getElementById('ws-dot');
+  const statusEl = document.getElementById('ws-status');
+  stream.innerHTML = '';
+
+  // Connect
+  dot.className = 'ws-dot connected';
+  statusEl.textContent = 'Connected (WebSocket)';
+  statusEl.style.color = 'var(--green)';
+
+  for (const event of SUBSCRIPTION_EVENTS) {
+    await new Promise(r => setTimeout(r, event.type === 'protocol' ? 600 : 900));
+
+    const line = document.createElement('div');
+    line.className = 'event-line';
+    if (event.type === 'protocol') line.classList.add('protocol');
+    else if (event.type === 'data') line.classList.add('data-event');
+    else line.classList.add('complete-event');
+
+    const dirSpan = `<span style="color: var(--text-dim); min-width: 140px; display: inline-block;">[${event.dir}]</span>`;
+    line.innerHTML = `${dirSpan} ${escapeHtml(event.msg)}`;
+    stream.appendChild(line);
+
+    // Trigger reflow then show
+    requestAnimationFrame(() => { line.classList.add('visible'); });
+    stream.scrollTop = stream.scrollHeight;
+  }
+
+  // Disconnect
+  await new Promise(r => setTimeout(r, 800));
+  dot.className = 'ws-dot disconnected';
+  statusEl.textContent = 'Disconnected (subscription complete)';
+  statusEl.style.color = 'var(--text-dim)';
+
+  subRunning = false;
+  document.getElementById('btn-subscribe').disabled = false;
+}
+
+function resetSubscription() {
+  document.getElementById('event-stream').innerHTML = '';
+  document.getElementById('ws-dot').className = 'ws-dot';
+  document.getElementById('ws-status').textContent = 'Disconnected';
+  document.getElementById('ws-status').style.color = 'var(--text-dim)';
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Section 3: Interactive Query Builder
+// ═══════════════════════════════════════════════════════════════════
+
+function getSelectedFields() {
+  const checked = [];
+  document.querySelectorAll('.field-check input[type="checkbox"]').forEach(cb => {
+    if (cb.checked) checked.push(cb.dataset.field);
+  });
+  return checked;
+}
+
+function buildQueryString(fields) {
+  if (fields.length === 0) return 'query {\n  order(id: "ord_a1b2") {\n    # no fields selected\n  }\n}';
+
+  const topLevel = [];
+  const nested = {};
+
+  fields.forEach(f => {
+    const parts = f.split('.');
+    if (parts.length === 1) {
+      topLevel.push(parts[0]);
+    } else {
+      const parent = parts[0];
+      const child = parts.slice(1).join('.');
+      if (!nested[parent]) nested[parent] = [];
+      nested[parent].push(child);
+    }
+  });
+
+  let lines = ['query {', '  order(id: "ord_a1b2") {'];
+  topLevel.forEach(f => lines.push(`    ${f}`));
+
+  Object.keys(nested).sort().forEach(parent => {
+    const children = nested[parent];
+    // Handle deeper nesting (items.menuItem.name)
+    const subNested = {};
+    const directChildren = [];
+    children.forEach(c => {
+      const parts = c.split('.');
+      if (parts.length === 1) {
+        directChildren.push(parts[0]);
+      } else {
+        if (!subNested[parts[0]]) subNested[parts[0]] = [];
+        subNested[parts[0]].push(parts.slice(1).join('.'));
+      }
+    });
+
+    if (Object.keys(subNested).length > 0) {
+      lines.push(`    ${parent} {`);
+      directChildren.forEach(c => lines.push(`      ${c}`));
+      Object.keys(subNested).forEach(sub => {
+        lines.push(`      ${sub} { ${subNested[sub].join(', ')} }`);
+      });
+      lines.push('    }');
+    } else {
+      if (directChildren.length <= 3) {
+        lines.push(`    ${parent} { ${directChildren.join(', ')} }`);
+      } else {
+        lines.push(`    ${parent} {`);
+        directChildren.forEach(c => lines.push(`      ${c}`));
+        lines.push('    }');
+      }
+    }
+  });
+
+  lines.push('  }');
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function resolveFields(fields) {
+  const result = {};
+
+  fields.forEach(f => {
+    const parts = f.split('.');
+    let source = FULL_ORDER;
+    let target = result;
+
+    for (let i = 0; i < parts.length; i++) {
+      const key = parts[i];
+      const isLast = i === parts.length - 1;
+
+      if (isLast) {
+        if (Array.isArray(source)) {
+          // Already handled by parent
+        } else if (source && typeof source === 'object') {
+          target[key] = source[key];
+        }
+      } else {
+        if (Array.isArray(source[key])) {
+          if (!target[key]) target[key] = source[key].map(() => ({}));
+          // Resolve remaining path for each array element
+          const remaining = parts.slice(i + 1).join('.');
+          source[key].forEach((item, idx) => {
+            let src = item;
+            let tgt = target[key][idx];
+            const rParts = remaining.split('.');
+            for (let j = 0; j < rParts.length; j++) {
+              if (j === rParts.length - 1) {
+                tgt[rParts[j]] = src[rParts[j]];
+              } else {
+                if (!tgt[rParts[j]]) tgt[rParts[j]] = {};
+                tgt = tgt[rParts[j]];
+                src = src[rParts[j]];
+              }
+            }
+          });
+          return; // Fully handled
+        } else {
+          if (!target[key]) target[key] = {};
+          source = source[key];
+          target = target[key];
+        }
+      }
+    }
+  });
+
+  return { data: { order: result } };
+}
+
+function updateQuery() {
+  const fields = getSelectedFields();
+  const queryStr = buildQueryString(fields);
+  document.getElementById('query-code').textContent = queryStr;
+
+  if (fields.length === 0) {
+    document.getElementById('response-preview').textContent = '// Select fields to see the response';
+    document.getElementById('gql-size-badge').textContent = 'GraphQL: 0 bytes';
+    document.getElementById('chart-gql').style.width = '2px';
+    document.getElementById('chart-gql').textContent = '0 B';
+    document.getElementById('chart-reduction').textContent = '\u2014';
+    return;
+  }
+
+  const response = resolveFields(fields);
+  const responseStr = JSON.stringify(response, null, 2);
+  const responseSize = JSON.stringify(response).length;
+
+  document.getElementById('response-preview').textContent = responseStr;
+  document.getElementById('gql-size-badge').textContent = `GraphQL: ${responseSize} bytes`;
+  document.getElementById('rest-size-badge').textContent = `REST (full): ${REST_FULL_SIZE} bytes`;
+
+  // Update chart
+  const maxBarWidth = 500;
+  const restWidth = maxBarWidth;
+  const gqlWidth = Math.max(20, (responseSize / REST_FULL_SIZE) * maxBarWidth);
+  const reduction = ((1 - responseSize / REST_FULL_SIZE) * 100).toFixed(0);
+
+  document.getElementById('chart-rest').style.width = restWidth + 'px';
+  document.getElementById('chart-rest').textContent = REST_FULL_SIZE + ' B';
+  document.getElementById('chart-gql').style.width = gqlWidth + 'px';
+  document.getElementById('chart-gql').textContent = responseSize + ' B';
+  document.getElementById('chart-reduction').textContent =
+    `${reduction}% smaller (${(REST_FULL_SIZE / responseSize).toFixed(1)}x reduction)`;
+}
+
+// Initialize query builder on load
+updateQuery();
+</script>
+
+</body>
+</html>

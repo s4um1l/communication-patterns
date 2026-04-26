@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appendix D — Resilience Patterns Visual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --orange-glow: rgba(251, 146, 60, 0.3);
+    --red: #f87171;
+    --red-glow: rgba(248, 113, 113, 0.3);
+    --purple: #a78bfa;
+    --purple-glow: rgba(167, 139, 250, 0.3);
+    --cyan: #22d3ee;
+    --cyan-glow: rgba(34, 211, 238, 0.3);
+    --yellow: #facc15;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    width: 900px;
+    max-width: 95vw;
+  }
+
+  .section {
+    width: 900px;
+    max-width: 95vw;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section h3 {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.green { background: #22c55e; }
+  .btn.green:hover { background: #16a34a; box-shadow: 0 0 16px var(--green-glow); }
+  .btn.orange { background: #ea580c; }
+  .btn.orange:hover { background: #c2410c; box-shadow: 0 0 16px var(--orange-glow); }
+  .btn.red { background: #dc2626; }
+  .btn.red:hover { background: #b91c1c; box-shadow: 0 0 16px var(--red-glow); }
+  .btn.purple { background: #7c3aed; }
+  .btn.purple:hover { background: #6d28d9; box-shadow: 0 0 16px var(--purple-glow); }
+
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  canvas {
+    width: 100%;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+
+  .log-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.5;
+    margin-top: 0.75rem;
+  }
+  .log-box .success { color: var(--green); }
+  .log-box .failure { color: var(--red); }
+  .log-box .rejected { color: var(--orange); }
+  .log-box .info { color: var(--text-dim); }
+
+  .state-indicator {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .state-closed { background: rgba(74,222,128,0.15); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+  .state-open { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+  .state-half-open { background: rgba(251,146,60,0.15); color: var(--orange); border: 1px solid rgba(251,146,60,0.3); }
+
+  .stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .stat {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+  .stat span { color: var(--text); font-weight: 600; }
+
+  label {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  label input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+  select {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+  }
+
+  .chain-viz {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+  }
+  .chain-node {
+    width: 80px;
+    height: 60px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    transition: all 0.3s;
+  }
+  .chain-node.healthy { border-color: var(--green); background: rgba(74,222,128,0.08); }
+  .chain-node.failing { border-color: var(--red); background: rgba(248,113,113,0.08); }
+  .chain-node .count {
+    font-size: 1.1rem;
+    margin-top: 2px;
+  }
+  .chain-arrow {
+    color: var(--text-dim);
+    font-size: 1.2rem;
+  }
+
+  .timeout-layer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .timeout-layer .label-col {
+    width: 120px;
+    font-weight: 600;
+  }
+  .timeout-bar-bg {
+    flex: 1;
+    height: 28px;
+    background: var(--surface2);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .timeout-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.05s linear;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .timeout-val {
+    width: 50px;
+    text-align: right;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+
+<h1>Appendix D — Resilience Patterns</h1>
+<p class="subtitle">Retry, Circuit Breaker, Backoff — Interactive Visualization</p>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Section 1: Exponential Backoff with Jitter                     -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+
+<h2>1. Exponential Backoff with Jitter</h2>
+
+<div class="section">
+  <h3>Retry Timeline — Multiple Clients</h3>
+  <div class="controls">
+    <button class="btn" onclick="startBackoffDemo()">Run Backoff Demo</button>
+    <button class="btn orange" onclick="resetBackoffDemo()">Reset</button>
+    <label><input type="checkbox" id="jitterToggle" checked> Enable Jitter</label>
+    <select id="jitterStrategy">
+      <option value="full">Full Jitter (AWS recommended)</option>
+      <option value="equal">Equal Jitter</option>
+      <option value="decorrelated">Decorrelated Jitter</option>
+    </select>
+    <label>Clients: <select id="clientCount">
+      <option value="5">5</option>
+      <option value="10" selected>10</option>
+      <option value="20">20</option>
+    </select></label>
+  </div>
+  <canvas id="backoffCanvas" height="350"></canvas>
+  <div class="stats" id="backoffStats"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Section 2: Circuit Breaker                                      -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+
+<h2>2. Circuit Breaker State Machine</h2>
+
+<div class="section">
+  <h3>Interactive Circuit Breaker</h3>
+  <div class="controls">
+    <button class="btn green" onclick="cbSendSuccess()">Send Success</button>
+    <button class="btn red" onclick="cbSendFailure()">Send Failure</button>
+    <button class="btn orange" onclick="cbReset()">Reset</button>
+    <span>State: </span>
+    <span class="state-indicator state-closed" id="cbStateDisplay">CLOSED</span>
+  </div>
+  <canvas id="cbCanvas" height="300"></canvas>
+  <div class="stats" id="cbStats">
+    <div class="stat">Failures: <span id="cbFailCount">0</span>/5</div>
+    <div class="stat">Successes: <span id="cbSuccessCount">0</span></div>
+    <div class="stat">Rejected: <span id="cbRejected">0</span></div>
+    <div class="stat">Recovery in: <span id="cbTimer">--</span></div>
+  </div>
+  <div class="log-box" id="cbLog"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Section 3: Retry Amplification                                  -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+
+<h2>3. Retry Amplification</h2>
+
+<div class="section">
+  <h3>5-Service Chain — Inject Failure at Service E</h3>
+  <div class="controls">
+    <button class="btn red" onclick="startAmplification(false)">Send Request (No Budget)</button>
+    <button class="btn green" onclick="startAmplification(true)">Send Request (With Budget)</button>
+    <button class="btn orange" onclick="resetAmplification()">Reset</button>
+    <label><input type="checkbox" id="budgetToggle"> Retry Budget (20%)</label>
+  </div>
+  <div class="chain-viz" id="chainViz">
+    <div class="chain-node healthy" id="node-A"><div>Svc A</div><div class="count" id="count-A">0</div></div>
+    <span class="chain-arrow">--></span>
+    <div class="chain-node healthy" id="node-B"><div>Svc B</div><div class="count" id="count-B">0</div></div>
+    <span class="chain-arrow">--></span>
+    <div class="chain-node healthy" id="node-C"><div>Svc C</div><div class="count" id="count-C">0</div></div>
+    <span class="chain-arrow">--></span>
+    <div class="chain-node healthy" id="node-D"><div>Svc D</div><div class="count" id="count-D">0</div></div>
+    <span class="chain-arrow">--></span>
+    <div class="chain-node failing" id="node-E"><div>Svc E</div><div class="count" id="count-E">0</div></div>
+  </div>
+  <div class="stats">
+    <div class="stat">Total requests: <span id="ampTotal">0</span></div>
+    <div class="stat">Amplification: <span id="ampFactor">0</span>x</div>
+    <div class="stat">Retries denied: <span id="ampDenied">0</span></div>
+  </div>
+  <div class="log-box" id="ampLog"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Section 4: Timeout Cascade                                      -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+
+<h2>4. Timeout Cascade</h2>
+
+<div class="section">
+  <h3>Client / Load Balancer / Server Timeout Interaction</h3>
+  <div class="controls">
+    <button class="btn red" onclick="startTimeoutBad()">Bad Config (Client &lt; Server)</button>
+    <button class="btn green" onclick="startTimeoutGood()">Good Config (Client &gt; Server)</button>
+    <button class="btn orange" onclick="resetTimeout()">Reset</button>
+  </div>
+  <div id="timeoutLayers">
+    <div class="timeout-layer">
+      <div class="label-col" style="color:var(--cyan)">Client</div>
+      <div class="timeout-bar-bg">
+        <div class="timeout-bar-fill" id="clientBar" style="width:0%;background:var(--cyan);color:#000"></div>
+      </div>
+      <div class="timeout-val" id="clientVal">--</div>
+    </div>
+    <div class="timeout-layer">
+      <div class="label-col" style="color:var(--purple)">Load Balancer</div>
+      <div class="timeout-bar-bg">
+        <div class="timeout-bar-fill" id="lbBar" style="width:0%;background:var(--purple);color:#000"></div>
+      </div>
+      <div class="timeout-val" id="lbVal">--</div>
+    </div>
+    <div class="timeout-layer">
+      <div class="label-col" style="color:var(--orange)">Server</div>
+      <div class="timeout-bar-bg">
+        <div class="timeout-bar-fill" id="serverBar" style="width:0%;background:var(--orange);color:#000"></div>
+      </div>
+      <div class="timeout-val" id="serverVal">--</div>
+    </div>
+  </div>
+  <div class="log-box" id="timeoutLog" style="margin-top:1rem"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// Utilities
+// ════════════════════════════════════════════════════════════════
+
+const C = {
+  bg: '#0f1117', surface: '#1a1d27', surface2: '#242836', border: '#2e3347',
+  text: '#e4e6f0', dim: '#8b8fa3', accent: '#6c8cff', green: '#4ade80',
+  orange: '#fb923c', red: '#f87171', purple: '#a78bfa', cyan: '#22d3ee',
+  yellow: '#facc15',
+};
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+function appendLog(id, msg, cls) {
+  const box = document.getElementById(id);
+  const div = document.createElement('div');
+  div.className = cls || '';
+  div.textContent = msg;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog(id) {
+  document.getElementById(id).innerHTML = '';
+}
+
+// ════════════════════════════════════════════════════════════════
+// Section 1: Backoff Demo
+// ════════════════════════════════════════════════════════════════
+
+let backoffAnim = null;
+
+function computeDelay(attempt, strategy, prevDelay, base, maxDelay) {
+  const baseDelay = Math.min(base * Math.pow(2, attempt), maxDelay);
+  if (strategy === 'none') return baseDelay;
+  if (strategy === 'full') return rand(0, baseDelay);
+  if (strategy === 'equal') { const h = baseDelay / 2; return h + rand(0, h); }
+  if (strategy === 'decorrelated') return Math.min(rand(base, Math.max(base, prevDelay * 3)), maxDelay);
+  return baseDelay;
+}
+
+function startBackoffDemo() {
+  if (backoffAnim) cancelAnimationFrame(backoffAnim);
+
+  const canvas = document.getElementById('backoffCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+
+  const jitterOn = document.getElementById('jitterToggle').checked;
+  const strategy = jitterOn ? document.getElementById('jitterStrategy').value : 'none';
+  const numClients = parseInt(document.getElementById('clientCount').value);
+  const maxAttempts = 6;
+  const base = 1.0;
+  const maxDelay = 32.0;
+
+  // Pre-compute all retry times for all clients
+  const clientData = [];
+  let globalMaxTime = 0;
+  for (let c = 0; c < numClients; c++) {
+    const times = [0]; // initial failure at t=0
+    let prevDelay = 0;
+    for (let a = 0; a < maxAttempts; a++) {
+      const d = computeDelay(a, strategy, prevDelay, base, maxDelay);
+      prevDelay = d;
+      times.push(times[times.length - 1] + d);
+    }
+    clientData.push(times);
+    globalMaxTime = Math.max(globalMaxTime, times[times.length - 1]);
+  }
+  globalMaxTime = Math.max(globalMaxTime, 1);
+
+  // Compute server load histogram
+  const numBuckets = 80;
+  const bucketWidth = globalMaxTime / numBuckets;
+  const loadHist = new Array(numBuckets).fill(0);
+  for (const times of clientData) {
+    for (const t of times) {
+      const b = Math.min(Math.floor(t / bucketWidth), numBuckets - 1);
+      loadHist[b]++;
+    }
+  }
+  const maxLoad = Math.max(...loadHist, 1);
+
+  // Animate
+  const startTime = performance.now();
+  const animDuration = 3000; // ms
+
+  function draw() {
+    const elapsed = (performance.now() - startTime) / animDuration;
+    const progress = Math.min(elapsed, 1);
+    const currentTime = progress * globalMaxTime;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const marginL = 70, marginR = 20, marginT = 30, marginB = 80;
+    const plotW = W - marginL - marginR;
+    const clientAreaH = H - marginB - marginT - 80; // leave room for histogram
+    const histH = 60;
+    const histTop = H - marginB - histH;
+
+    // Title
+    ctx.fillStyle = C.dim;
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `${numClients} clients, ${strategy} jitter, ${maxAttempts} retries`,
+      W / 2, 18
+    );
+
+    // Time axis
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(marginL, histTop - 4);
+    ctx.lineTo(marginL + plotW, histTop - 4);
+    ctx.stroke();
+
+    // Time labels
+    ctx.fillStyle = C.dim;
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    for (let t = 0; t <= globalMaxTime; t += Math.max(1, Math.floor(globalMaxTime / 8))) {
+      const x = marginL + (t / globalMaxTime) * plotW;
+      ctx.fillText(t.toFixed(0) + 's', x, histTop + histH + 16);
+    }
+
+    // Draw client rows
+    const rowH = Math.min(clientAreaH / numClients, 22);
+    for (let c = 0; c < numClients; c++) {
+      const y = marginT + c * rowH + rowH / 2;
+      const times = clientData[c];
+
+      // Client label
+      ctx.fillStyle = C.dim;
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Client ${c}`, marginL - 8, y + 4);
+
+      // Draw timeline line
+      ctx.strokeStyle = C.border;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(marginL, y);
+      ctx.lineTo(marginL + plotW, y);
+      ctx.stroke();
+
+      // Draw retry dots
+      for (let i = 0; i < times.length; i++) {
+        if (times[i] > currentTime) continue;
+        const x = marginL + (times[i] / globalMaxTime) * plotW;
+        const isFirst = i === 0;
+        const radius = isFirst ? 5 : 4;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = isFirst ? C.red : (jitterOn ? C.green : C.orange);
+        ctx.fill();
+      }
+    }
+
+    // Draw server load histogram
+    ctx.fillStyle = C.dim;
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('Server', marginL - 8, histTop + histH / 2 + 4);
+    ctx.fillText('Load', marginL - 8, histTop + histH / 2 + 16);
+
+    const barW = plotW / numBuckets;
+    for (let b = 0; b < numBuckets; b++) {
+      const bucketTime = b * bucketWidth;
+      if (bucketTime > currentTime) continue;
+      const barH = (loadHist[b] / maxLoad) * histH;
+      const x = marginL + b * barW;
+      const intensity = loadHist[b] / maxLoad;
+      if (intensity > 0.7) ctx.fillStyle = C.red;
+      else if (intensity > 0.4) ctx.fillStyle = C.orange;
+      else ctx.fillStyle = C.green;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(x, histTop + histH - barH, barW - 1, barH);
+      ctx.globalAlpha = 1;
+    }
+
+    // Stats
+    const statsEl = document.getElementById('backoffStats');
+    const peakLoad = Math.max(...loadHist);
+    statsEl.innerHTML = `
+      <div class="stat">Strategy: <span>${strategy}</span></div>
+      <div class="stat">Peak simultaneous: <span>${peakLoad}</span></div>
+      <div class="stat">Max time: <span>${globalMaxTime.toFixed(1)}s</span></div>
+    `;
+
+    if (progress < 1) {
+      backoffAnim = requestAnimationFrame(draw);
+    }
+  }
+
+  draw();
+}
+
+function resetBackoffDemo() {
+  if (backoffAnim) cancelAnimationFrame(backoffAnim);
+  const canvas = document.getElementById('backoffCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  document.getElementById('backoffStats').innerHTML = '';
+}
+
+// ════════════════════════════════════════════════════════════════
+// Section 2: Circuit Breaker
+// ════════════════════════════════════════════════════════════════
+
+const cb = {
+  state: 'CLOSED',
+  failCount: 0,
+  threshold: 5,
+  successCount: 0,
+  rejected: 0,
+  recoveryTimeout: 5000,
+  openedAt: 0,
+  timerInterval: null,
+  events: [],  // {time, type, state}
+};
+
+function cbUpdateUI() {
+  const el = document.getElementById('cbStateDisplay');
+  el.textContent = cb.state;
+  el.className = 'state-indicator state-' + cb.state.toLowerCase().replace('_', '-');
+  document.getElementById('cbFailCount').textContent = cb.failCount;
+  document.getElementById('cbSuccessCount').textContent = cb.successCount;
+  document.getElementById('cbRejected').textContent = cb.rejected;
+  cbDrawCanvas();
+}
+
+function cbStartTimer() {
+  if (cb.timerInterval) clearInterval(cb.timerInterval);
+  cb.timerInterval = setInterval(() => {
+    if (cb.state === 'OPEN') {
+      const elapsed = Date.now() - cb.openedAt;
+      const remaining = Math.max(0, cb.recoveryTimeout - elapsed);
+      document.getElementById('cbTimer').textContent = (remaining / 1000).toFixed(1) + 's';
+      if (remaining <= 0) {
+        cb.state = 'HALF_OPEN';
+        cb.events.push({ time: Date.now(), type: 'transition', state: 'HALF_OPEN' });
+        appendLog('cbLog', `[HALF-OPEN] Recovery timeout elapsed — allowing test request`, 'info');
+        cbUpdateUI();
+        clearInterval(cb.timerInterval);
+        document.getElementById('cbTimer').textContent = 'TEST';
+      }
+    }
+  }, 100);
+}
+
+function cbSendSuccess() {
+  if (cb.state === 'OPEN') {
+    cb.rejected++;
+    appendLog('cbLog', `[REJECTED] Circuit is OPEN — request rejected (0ms)`, 'rejected');
+    cb.events.push({ time: Date.now(), type: 'rejected', state: cb.state });
+    cbUpdateUI();
+    return;
+  }
+  if (cb.state === 'HALF_OPEN') {
+    cb.state = 'CLOSED';
+    cb.failCount = 0;
+    cb.successCount++;
+    cb.events.push({ time: Date.now(), type: 'success', state: 'HALF_OPEN->CLOSED' });
+    appendLog('cbLog', `[SUCCESS] Test request succeeded — circuit CLOSED`, 'success');
+    if (cb.timerInterval) clearInterval(cb.timerInterval);
+    document.getElementById('cbTimer').textContent = '--';
+    cbUpdateUI();
+    return;
+  }
+  cb.successCount++;
+  cb.events.push({ time: Date.now(), type: 'success', state: cb.state });
+  appendLog('cbLog', `[SUCCESS] Request succeeded (${cb.failCount}/${cb.threshold} failures)`, 'success');
+  cbUpdateUI();
+}
+
+function cbSendFailure() {
+  if (cb.state === 'OPEN') {
+    cb.rejected++;
+    appendLog('cbLog', `[REJECTED] Circuit is OPEN — request rejected (0ms)`, 'rejected');
+    cb.events.push({ time: Date.now(), type: 'rejected', state: cb.state });
+    cbUpdateUI();
+    return;
+  }
+  if (cb.state === 'HALF_OPEN') {
+    cb.state = 'OPEN';
+    cb.openedAt = Date.now();
+    cb.events.push({ time: Date.now(), type: 'failure', state: 'HALF_OPEN->OPEN' });
+    appendLog('cbLog', `[FAILURE] Test request failed — circuit re-OPENED`, 'failure');
+    cbStartTimer();
+    cbUpdateUI();
+    return;
+  }
+  cb.failCount++;
+  cb.events.push({ time: Date.now(), type: 'failure', state: cb.state });
+  if (cb.failCount >= cb.threshold) {
+    cb.state = 'OPEN';
+    cb.openedAt = Date.now();
+    cb.events.push({ time: Date.now(), type: 'transition', state: 'OPEN' });
+    appendLog('cbLog', `[FAILURE] ${cb.failCount}/${cb.threshold} failures — CIRCUIT OPENED`, 'failure');
+    cbStartTimer();
+  } else {
+    appendLog('cbLog', `[FAILURE] Request failed (${cb.failCount}/${cb.threshold} failures)`, 'failure');
+  }
+  cbUpdateUI();
+}
+
+function cbReset() {
+  if (cb.timerInterval) clearInterval(cb.timerInterval);
+  cb.state = 'CLOSED';
+  cb.failCount = 0;
+  cb.successCount = 0;
+  cb.rejected = 0;
+  cb.events = [];
+  document.getElementById('cbTimer').textContent = '--';
+  clearLog('cbLog');
+  cbUpdateUI();
+}
+
+function cbDrawCanvas() {
+  const canvas = document.getElementById('cbCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw state machine
+  const states = [
+    { name: 'CLOSED', x: W * 0.2, y: H * 0.5, color: C.green, r: 45 },
+    { name: 'OPEN', x: W * 0.5, y: H * 0.25, color: C.red, r: 45 },
+    { name: 'HALF_OPEN', x: W * 0.8, y: H * 0.5, color: C.orange, r: 45 },
+  ];
+
+  // Draw arrows
+  function drawArrow(from, to, label, offset) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const nx = dx/dist, ny = dy/dist;
+    const startX = from.x + nx * from.r;
+    const startY = from.y + ny * from.r;
+    const endX = to.x - nx * to.r;
+    const endY = to.y - ny * to.r;
+
+    const offX = -ny * (offset || 0);
+    const offY = nx * (offset || 0);
+
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(startX + offX, startY + offY);
+    const midX = (startX + endX) / 2 + offX * 2;
+    const midY = (startY + endY) / 2 + offY * 2;
+    ctx.quadraticCurveTo(midX, midY, endX + offX, endY + offY);
+    ctx.stroke();
+
+    // Arrowhead
+    const angle = Math.atan2(endY + offY - midY, endX + offX - midX);
+    ctx.beginPath();
+    ctx.moveTo(endX + offX, endY + offY);
+    ctx.lineTo(endX + offX - 10 * Math.cos(angle - 0.3), endY + offY - 10 * Math.sin(angle - 0.3));
+    ctx.lineTo(endX + offX - 10 * Math.cos(angle + 0.3), endY + offY - 10 * Math.sin(angle + 0.3));
+    ctx.closePath();
+    ctx.fillStyle = C.border;
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = C.dim;
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, midX, midY - 8);
+  }
+
+  drawArrow(states[0], states[1], `failures >= ${cb.threshold}`, 8);
+  drawArrow(states[1], states[2], 'timeout expires', 8);
+  drawArrow(states[2], states[0], 'test succeeds', 12);
+  drawArrow(states[2], states[1], 'test fails', -20);
+
+  // Draw state circles
+  for (const s of states) {
+    const isActive = cb.state === s.name;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? s.color + '30' : C.surface2;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? s.color : C.border;
+    ctx.lineWidth = isActive ? 3 : 1.5;
+    ctx.stroke();
+
+    if (isActive) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = s.color + '40';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = isActive ? s.color : C.text;
+    ctx.font = `${isActive ? 'bold' : 'normal'} 12px monospace`;
+    ctx.textAlign = 'center';
+    const displayName = s.name === 'HALF_OPEN' ? 'HALF-OPEN' : s.name;
+    ctx.fillText(displayName, s.x, s.y + 4);
+  }
+
+  // Draw recent events as dots along bottom
+  if (cb.events.length > 0) {
+    const recentEvents = cb.events.slice(-40);
+    const dotY = H - 20;
+    const dotSpacing = Math.min(20, (W - 40) / recentEvents.length);
+    const startX = W / 2 - (recentEvents.length * dotSpacing) / 2;
+
+    for (let i = 0; i < recentEvents.length; i++) {
+      const e = recentEvents[i];
+      const x = startX + i * dotSpacing;
+      ctx.beginPath();
+      ctx.arc(x, dotY, 4, 0, Math.PI * 2);
+      if (e.type === 'success') ctx.fillStyle = C.green;
+      else if (e.type === 'failure') ctx.fillStyle = C.red;
+      else if (e.type === 'rejected') ctx.fillStyle = C.orange;
+      else ctx.fillStyle = C.purple;
+      ctx.fill();
+    }
+
+    ctx.fillStyle = C.dim;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Recent events: green=success, red=failure, orange=rejected', W / 2, H - 4);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Section 3: Retry Amplification
+// ════════════════════════════════════════════════════════════════
+
+let ampAnim = null;
+const ampState = { counters: {A:0,B:0,C:0,D:0,E:0}, total: 0, denied: 0 };
+
+function resetAmplification() {
+  if (ampAnim) { clearTimeout(ampAnim); ampAnim = null; }
+  ampState.counters = {A:0,B:0,C:0,D:0,E:0};
+  ampState.total = 0;
+  ampState.denied = 0;
+  for (const s of 'ABCDE') {
+    document.getElementById('count-' + s).textContent = '0';
+    const node = document.getElementById('node-' + s);
+    node.className = 'chain-node ' + (s === 'E' ? 'failing' : 'healthy');
+  }
+  document.getElementById('ampTotal').textContent = '0';
+  document.getElementById('ampFactor').textContent = '0';
+  document.getElementById('ampDenied').textContent = '0';
+  clearLog('ampLog');
+}
+
+function startAmplification(withBudget) {
+  resetAmplification();
+  document.getElementById('budgetToggle').checked = withBudget;
+
+  const retriesPerHop = 3;
+  const budgetPct = 20;
+  const retryCounts = {A:0,B:0,C:0,D:0};
+  const requestCounts = {A:0,B:0,C:0,D:0};
+  const queue = []; // {service, depth, isRetry, retryNum}
+
+  function simulateChain(serviceName, depth, callback) {
+    const svc = serviceName;
+    ampState.counters[svc]++;
+    ampState.total++;
+    requestCounts[svc] = (requestCounts[svc] || 0) + 1;
+    document.getElementById('count-' + svc).textContent = ampState.counters[svc];
+    document.getElementById('ampTotal').textContent = ampState.total;
+    document.getElementById('ampFactor').textContent = ampState.total + 'x';
+
+    if (svc === 'E') {
+      ampState.counters.E++;
+      ampState.total++;
+      document.getElementById('count-E').textContent = ampState.counters.E;
+      document.getElementById('ampTotal').textContent = ampState.total;
+      document.getElementById('ampFactor').textContent = ampState.total + 'x';
+      appendLog('ampLog', `  ${svc}: FAILED (service is down)`, 'failure');
+      callback(false);
+      return;
+    }
+
+    const nextSvc = String.fromCharCode(svc.charCodeAt(0) + 1);
+
+    let attempt = 0;
+    function tryNext() {
+      simulateChain(nextSvc, depth - 1, (success) => {
+        if (success) {
+          callback(true);
+          return;
+        }
+        attempt++;
+        if (attempt >= retriesPerHop) {
+          appendLog('ampLog', `  ${svc}: All ${retriesPerHop} retries exhausted`, 'failure');
+          callback(false);
+          return;
+        }
+        // Check budget
+        if (withBudget) {
+          const totalReqs = requestCounts[svc] || 1;
+          const totalRetries = retryCounts[svc] || 0;
+          const pct = (totalRetries / (totalReqs + totalRetries)) * 100;
+          if (pct >= budgetPct && totalRetries >= 1) {
+            ampState.denied++;
+            document.getElementById('ampDenied').textContent = ampState.denied;
+            appendLog('ampLog', `  ${svc}: Retry DENIED by budget (${pct.toFixed(0)}% >= ${budgetPct}%)`, 'rejected');
+            callback(false);
+            return;
+          }
+        }
+        retryCounts[svc] = (retryCounts[svc] || 0) + 1;
+        appendLog('ampLog', `  ${svc}: Retrying (attempt ${attempt + 1}/${retriesPerHop})`, 'info');
+        ampAnim = setTimeout(tryNext, 30);
+      });
+    }
+
+    appendLog('ampLog', `  ${svc}: Calling ${nextSvc}...`, 'info');
+    ampAnim = setTimeout(tryNext, 30);
+  }
+
+  appendLog('ampLog', `Starting request ${withBudget ? 'WITH' : 'WITHOUT'} retry budget...`, 'info');
+  simulateChain('A', 5, (success) => {
+    const status = success ? 'SUCCESS' : 'FAILED';
+    appendLog('ampLog', `\nResult: ${status} | Total requests: ${ampState.total}x amplification`, success ? 'success' : 'failure');
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// Section 4: Timeout Cascade
+// ════════════════════════════════════════════════════════════════
+
+let timeoutAnim = null;
+
+function resetTimeout() {
+  if (timeoutAnim) { clearInterval(timeoutAnim); timeoutAnim = null; }
+  document.getElementById('clientBar').style.width = '0%';
+  document.getElementById('lbBar').style.width = '0%';
+  document.getElementById('serverBar').style.width = '0%';
+  document.getElementById('clientBar').textContent = '';
+  document.getElementById('lbBar').textContent = '';
+  document.getElementById('serverBar').textContent = '';
+  document.getElementById('clientVal').textContent = '--';
+  document.getElementById('lbVal').textContent = '--';
+  document.getElementById('serverVal').textContent = '--';
+  clearLog('timeoutLog');
+}
+
+function runTimeout(clientTO, lbTO, serverTO, processingTime, label) {
+  resetTimeout();
+  appendLog('timeoutLog', `${label}`, 'info');
+  appendLog('timeoutLog', `Client timeout: ${clientTO}s | LB timeout: ${lbTO}s | Server timeout: ${serverTO}s`, 'info');
+  appendLog('timeoutLog', `Server processing time: ${processingTime}s`, 'info');
+  appendLog('timeoutLog', '', 'info');
+
+  const maxTO = Math.max(clientTO, lbTO, serverTO, processingTime) + 1;
+  const startTime = Date.now();
+  let clientDone = false, lbDone = false, serverDone = false;
+  let clientRetried = false;
+
+  timeoutAnim = setInterval(() => {
+    const elapsed = (Date.now() - startTime) / 1000;
+
+    // Client bar
+    const clientPct = Math.min(elapsed / clientTO * 100, 100);
+    const clientBar = document.getElementById('clientBar');
+    clientBar.style.width = clientPct + '%';
+    document.getElementById('clientVal').textContent = Math.min(elapsed, clientTO).toFixed(1) + 's';
+
+    if (clientPct >= 100 && !clientDone) {
+      clientDone = true;
+      clientBar.style.background = C.red;
+      clientBar.textContent = 'TIMEOUT';
+      appendLog('timeoutLog', `[${elapsed.toFixed(1)}s] Client TIMEOUT — gives up`, 'failure');
+      if (elapsed < processingTime && !clientRetried) {
+        clientRetried = true;
+        appendLog('timeoutLog', `[${elapsed.toFixed(1)}s] Client RETRIES — server still processing original!`, 'failure');
+      }
+    } else if (!clientDone) {
+      clientBar.textContent = elapsed.toFixed(1) + 's';
+    }
+
+    // LB bar
+    const lbPct = Math.min(elapsed / lbTO * 100, 100);
+    const lbBar = document.getElementById('lbBar');
+    lbBar.style.width = lbPct + '%';
+    document.getElementById('lbVal').textContent = Math.min(elapsed, lbTO).toFixed(1) + 's';
+
+    if (lbPct >= 100 && !lbDone) {
+      lbDone = true;
+      lbBar.style.background = C.red;
+      lbBar.textContent = 'TIMEOUT';
+      appendLog('timeoutLog', `[${elapsed.toFixed(1)}s] Load Balancer TIMEOUT`, 'failure');
+    } else if (!lbDone) {
+      lbBar.textContent = elapsed.toFixed(1) + 's';
+    }
+
+    // Server bar
+    const serverPct = Math.min(elapsed / processingTime * 100, 100);
+    const serverBar = document.getElementById('serverBar');
+    serverBar.style.width = serverPct + '%';
+    document.getElementById('serverVal').textContent = Math.min(elapsed, processingTime).toFixed(1) + 's';
+
+    if (serverPct >= 100 && !serverDone) {
+      serverDone = true;
+      if (clientDone) {
+        serverBar.style.background = C.orange;
+        serverBar.textContent = 'WASTED';
+        appendLog('timeoutLog', `[${elapsed.toFixed(1)}s] Server finishes — but client already timed out! WASTED WORK`, 'rejected');
+      } else {
+        serverBar.style.background = C.green;
+        serverBar.textContent = 'DONE';
+        appendLog('timeoutLog', `[${elapsed.toFixed(1)}s] Server responds — client receives it`, 'success');
+        clientBar.style.background = C.green;
+        clientBar.textContent = 'SUCCESS';
+        lbBar.style.background = C.green;
+        lbBar.textContent = 'DONE';
+        clientDone = true;
+        lbDone = true;
+      }
+    } else if (!serverDone) {
+      serverBar.textContent = elapsed.toFixed(1) + 's / ' + processingTime + 's';
+    }
+
+    if (elapsed > maxTO) {
+      clearInterval(timeoutAnim);
+      if (clientRetried) {
+        appendLog('timeoutLog', '', 'info');
+        appendLog('timeoutLog', 'Problem: Client timed out before server finished.', 'failure');
+        appendLog('timeoutLog', 'The retry creates a SECOND request on the server.', 'failure');
+        appendLog('timeoutLog', 'Fix: Set client timeout > LB timeout > server timeout.', 'info');
+      }
+    }
+  }, 50);
+}
+
+function startTimeoutBad() {
+  // Bad: client timeout < server processing time
+  runTimeout(3, 8, 15, 6, 'BAD CONFIG: Client(3s) < LB(8s) < Server(15s), Processing: 6s');
+}
+
+function startTimeoutGood() {
+  // Good: client > LB > server, and server < processing time
+  runTimeout(10, 7, 4, 3, 'GOOD CONFIG: Client(10s) > LB(7s) > Server(4s), Processing: 3s');
+}
+
+// ════════════════════════════════════════════════════════════════
+// Initialize
+// ════════════════════════════════════════════════════════════════
+
+cbDrawCanvas();
+</script>
+
+</body>
+</html>

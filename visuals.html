@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Communication Patterns — Interactive Visuals Index</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-size: 2rem;
+            color: #f0f6fc;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #8b949e;
+            margin-bottom: 40px;
+            font-size: 1.05rem;
+        }
+        .section-title {
+            font-size: 1.3rem;
+            color: #58a6ff;
+            margin: 40px 0 20px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #161b22;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.2s, transform 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .card:hover {
+            border-color: #58a6ff;
+            transform: translateY(-2px);
+        }
+        .card-header {
+            padding: 16px 20px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .card-chapter {
+            background: #21262d;
+            color: #58a6ff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .card-title {
+            font-size: 1.05rem;
+            color: #f0f6fc;
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 0 20px 16px;
+        }
+        .card-description {
+            color: #8b949e;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .tag {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+        .tag-animation { color: #f778ba; border-color: #f778ba33; background: #f778ba11; }
+        .tag-interactive { color: #7ee787; border-color: #7ee78733; background: #7ee78711; }
+        .tag-comparison { color: #d2a8ff; border-color: #d2a8ff33; background: #d2a8ff11; }
+        .tag-chart { color: #ffa657; border-color: #ffa65733; background: #ffa65711; }
+        .tag-protocol { color: #79c0ff; border-color: #79c0ff33; background: #79c0ff11; }
+
+        .card-preview {
+            height: 120px;
+            background: #0d1117;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 1px solid #21262d;
+            position: relative;
+            overflow: hidden;
+        }
+        .card-preview svg { width: 100%; height: 100%; }
+
+        .note {
+            text-align: center;
+            color: #8b949e;
+            margin-top: 40px;
+            font-size: 0.9rem;
+            padding: 16px;
+            background: #161b22;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+        }
+        .note code {
+            background: #21262d;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #79c0ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Communication Patterns — Interactive Visuals</h1>
+        <p class="subtitle">Click any card to open the interactive visualization in your browser</p>
+
+        <div class="section-title">Core Chapters</div>
+        <div class="grid">
+            <a class="card" href="chapters/ch00_foundations/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="40" y="20" width="60" height="30" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                        <text x="70" y="39" text-anchor="middle" fill="#58a6ff" font-size="10">Client</text>
+                        <rect x="240" y="20" width="60" height="30" rx="4" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="270" y="39" text-anchor="middle" fill="#7ee787" font-size="10">Server</text>
+                        <line x1="100" y1="35" x2="240" y2="35" stroke="#ffa657" stroke-width="1" stroke-dasharray="4,3"/>
+                        <text x="170" y="30" text-anchor="middle" fill="#ffa657" font-size="9">SYN →</text>
+                        <line x1="240" y1="50" x2="100" y2="65" stroke="#ffa657" stroke-width="1" stroke-dasharray="4,3"/>
+                        <text x="170" y="55" text-anchor="middle" fill="#ffa657" font-size="9">← SYN-ACK</text>
+                        <line x1="100" y1="75" x2="240" y2="75" stroke="#ffa657" stroke-width="1" stroke-dasharray="4,3"/>
+                        <text x="170" y="72" text-anchor="middle" fill="#ffa657" font-size="9">ACK →</text>
+                        <text x="170" y="105" text-anchor="middle" fill="#8b949e" font-size="9">TCP 3-Way Handshake + TLS + HTTP</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 00</span>
+                    <span class="card-title">TCP/HTTP Foundations</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Animated TCP handshake, TLS negotiation, and HTTP request lifecycle with latency breakdown charts for different geographic scenarios.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">animation</span>
+                        <span class="tag tag-chart">latency chart</span>
+                        <span class="tag tag-protocol">protocol</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch01_request_response/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="40" y="40" width="60" height="30" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                        <text x="70" y="59" text-anchor="middle" fill="#58a6ff" font-size="10">Client</text>
+                        <rect x="240" y="40" width="60" height="30" rx="4" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="270" y="59" text-anchor="middle" fill="#7ee787" font-size="10">Server</text>
+                        <line x1="100" y1="50" x2="235" y2="50" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrowBlue)"/>
+                        <text x="170" y="45" text-anchor="middle" fill="#58a6ff" font-size="9">POST /orders</text>
+                        <line x1="240" y1="62" x2="105" y2="62" stroke="#7ee787" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+                        <text x="170" y="77" text-anchor="middle" fill="#7ee787" font-size="9">201 Created</text>
+                        <text x="50" y="95" fill="#f47067" font-size="8">BLOCKED ████████</text>
+                        <text x="170" y="110" text-anchor="middle" fill="#8b949e" font-size="9">Client waits for response</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 01</span>
+                    <span class="card-title">Request-Response</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Animated order placement with HTTP headers flying, latency breakdown bars showing serialization/network/processing, and a "CLIENT BLOCKED" indicator.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">animation</span>
+                        <span class="tag tag-chart">latency bars</span>
+                        <span class="tag tag-interactive">speed slider</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch02_short_polling/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <text x="20" y="20" fill="#f47067" font-size="10">Requests:</text>
+                        <rect x="80" y="10" width="200" height="14" rx="3" fill="#21262d"/>
+                        <rect x="80" y="10" width="190" height="14" rx="3" fill="#f4706744"/>
+                        <rect x="80" y="10" width="12" height="14" rx="3" fill="#7ee787"/>
+                        <text x="20" y="45" fill="#8b949e" font-size="10">Useful:</text>
+                        <text x="80" y="45" fill="#7ee787" font-size="11" font-weight="bold">0.67%</text>
+                        <text x="130" y="45" fill="#8b949e" font-size="10">Wasted:</text>
+                        <text x="185" y="45" fill="#f47067" font-size="11" font-weight="bold">99.33%</text>
+                        <rect x="20" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/><rect x="28" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/>
+                        <rect x="36" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/><rect x="44" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/>
+                        <rect x="52" y="60" width="4" height="40" fill="#7ee787"/><rect x="60" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/>
+                        <rect x="68" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/><rect x="76" y="60" width="4" height="40" fill="#f47067" opacity="0.3"/>
+                        <text x="170" y="85" text-anchor="middle" fill="#8b949e" font-size="9">99% of polls return "no change"</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 02</span>
+                    <span class="card-title">Short Polling</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Animated timeline with green (useful) vs red (wasted) requests. Running efficiency counter, adjustable poll interval slider, and bandwidth ticker.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">animation</span>
+                        <span class="tag tag-interactive">poll interval slider</span>
+                        <span class="tag tag-chart">waste counter</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch03_long_polling/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <text x="20" y="15" fill="#ffa657" font-size="10" font-weight="bold">Short Poll</text>
+                        <text x="180" y="15" fill="#58a6ff" font-size="10" font-weight="bold">Long Poll</text>
+                        <line x1="160" y1="5" x2="160" y2="115" stroke="#21262d" stroke-width="1"/>
+                        <!-- Short poll side -->
+                        <line x1="30" y1="25" x2="80" y2="25" stroke="#f47067" stroke-width="1" opacity="0.4"/>
+                        <line x1="30" y1="35" x2="80" y2="35" stroke="#f47067" stroke-width="1" opacity="0.4"/>
+                        <line x1="30" y1="45" x2="80" y2="45" stroke="#f47067" stroke-width="1" opacity="0.4"/>
+                        <line x1="30" y1="55" x2="80" y2="55" stroke="#7ee787" stroke-width="1.5"/>
+                        <line x1="30" y1="65" x2="80" y2="65" stroke="#f47067" stroke-width="1" opacity="0.4"/>
+                        <text x="90" y="68" fill="#8b949e" font-size="8">many wasted</text>
+                        <!-- Long poll side -->
+                        <line x1="190" y1="25" x2="190" y2="53" stroke="#ffa657" stroke-width="1" stroke-dasharray="3,2"/>
+                        <text x="200" y="40" fill="#ffa657" font-size="8">waiting...</text>
+                        <line x1="190" y1="55" x2="280" y2="55" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="200" y="68" fill="#8b949e" font-size="8">instant notify</text>
+                        <text x="85" y="100" fill="#f47067" font-size="9">15 requests</text>
+                        <text x="220" y="100" fill="#7ee787" font-size="9">1 request</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 03</span>
+                    <span class="card-title">Long Polling</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Split-screen comparison: short polling (left) vs long polling (right) watching the same events. Held connections shown as dashed "WAITING" lines.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-comparison">side-by-side</span>
+                        <span class="tag tag-animation">animation</span>
+                        <span class="tag tag-interactive">advance status</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch04_server_sent_events/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="40" y="30" width="60" height="30" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                        <text x="70" y="49" text-anchor="middle" fill="#58a6ff" font-size="10">Client</text>
+                        <rect x="240" y="30" width="60" height="30" rx="4" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="270" y="49" text-anchor="middle" fill="#7ee787" font-size="10">Server</text>
+                        <line x1="240" y1="45" x2="105" y2="45" stroke="#d2a8ff" stroke-width="2"/>
+                        <circle cx="200" cy="45" r="4" fill="#d2a8ff"/><circle cx="170" cy="45" r="4" fill="#7ee787"/><circle cx="140" cy="45" r="4" fill="#ffa657"/>
+                        <text x="170" y="75" text-anchor="middle" fill="#d2a8ff" font-size="9">data: {"status":"preparing"}</text>
+                        <text x="170" y="95" text-anchor="middle" fill="#8b949e" font-size="9">Persistent stream — events flow continuously</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 04</span>
+                    <span class="card-title">Server-Sent Events</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Persistent connection pipe with colored event blobs flowing through. SSE event format display, bandwidth comparison with long polling inset.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">streaming</span>
+                        <span class="tag tag-comparison">vs long polling</span>
+                        <span class="tag tag-protocol">event format</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch05_websockets/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="20" y="35" width="70" height="30" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                        <text x="55" y="54" text-anchor="middle" fill="#58a6ff" font-size="9">Customer</text>
+                        <rect x="250" y="35" width="70" height="30" rx="4" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="285" y="54" text-anchor="middle" fill="#7ee787" font-size="9">Driver</text>
+                        <line x1="90" y1="45" x2="245" y2="45" stroke="#ffa657" stroke-width="1.5"/>
+                        <line x1="245" y1="55" x2="90" y2="55" stroke="#d2a8ff" stroke-width="1.5"/>
+                        <text x="170" y="42" text-anchor="middle" fill="#ffa657" font-size="8">"which floor?" →</text>
+                        <text x="170" y="68" text-anchor="middle" fill="#d2a8ff" font-size="8">← "3rd, door code 4521"</text>
+                        <text x="170" y="100" text-anchor="middle" fill="#8b949e" font-size="9">Full-duplex — both talk simultaneously</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 05</span>
+                    <span class="card-title">WebSockets</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Customer/Driver chat panels with bidirectional messages, upgrade handshake animation, frame inspector showing FIN/OPCODE/MASK/LEN, ping/pong heartbeats.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">bidirectional</span>
+                        <span class="tag tag-protocol">frame inspector</span>
+                        <span class="tag tag-chart">bandwidth savings</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch06_push_notifications/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="20" y="40" width="60" height="30" rx="4" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="50" y="59" text-anchor="middle" fill="#7ee787" font-size="9">Server</text>
+                        <rect x="140" y="40" width="60" height="30" rx="4" fill="none" stroke="#d2a8ff" stroke-width="1.5"/>
+                        <text x="170" y="54" text-anchor="middle" fill="#d2a8ff" font-size="8">Push</text>
+                        <text x="170" y="64" text-anchor="middle" fill="#d2a8ff" font-size="8">Service</text>
+                        <rect x="260" y="35" width="50" height="40" rx="8" fill="none" stroke="#8b949e" stroke-width="1.5"/>
+                        <text x="285" y="52" text-anchor="middle" fill="#8b949e" font-size="8">📱</text>
+                        <text x="285" y="65" text-anchor="middle" fill="#f47067" font-size="7">CLOSED</text>
+                        <line x1="80" y1="55" x2="135" y2="55" stroke="#ffa657" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+                        <line x1="200" y1="55" x2="255" y2="55" stroke="#ffa657" stroke-width="1.5" stroke-dasharray="4,3"/>
+                        <text x="170" y="95" text-anchor="middle" fill="#8b949e" font-size="9">Reaches users even when app is closed</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 06</span>
+                    <span class="card-title">Push Notifications</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Three-column flow: Server → Push Service → Device. Offline delivery animation, encryption step-by-step, and WebSocket vs Push comparison.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">offline delivery</span>
+                        <span class="tag tag-comparison">vs WebSocket</span>
+                        <span class="tag tag-protocol">encryption</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch07_pub_sub/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="20" y="45" width="60" height="25" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                        <text x="50" y="61" text-anchor="middle" fill="#58a6ff" font-size="9">Publisher</text>
+                        <rect x="140" y="45" width="60" height="25" rx="4" fill="none" stroke="#ffa657" stroke-width="1.5"/>
+                        <text x="170" y="61" text-anchor="middle" fill="#ffa657" font-size="9">Broker</text>
+                        <line x1="80" y1="57" x2="135" y2="57" stroke="#58a6ff" stroke-width="1"/>
+                        <line x1="200" y1="47" x2="260" y2="25" stroke="#7ee787" stroke-width="1"/>
+                        <line x1="200" y1="57" x2="260" y2="57" stroke="#7ee787" stroke-width="1"/>
+                        <line x1="200" y1="67" x2="260" y2="90" stroke="#7ee787" stroke-width="1"/>
+                        <text x="280" y="28" fill="#7ee787" font-size="8">Kitchen</text>
+                        <text x="280" y="60" fill="#7ee787" font-size="8">Billing</text>
+                        <text x="280" y="93" fill="#7ee787" font-size="8">Driver</text>
+                        <text x="170" y="110" text-anchor="middle" fill="#8b949e" font-size="9">One event → multiple independent reactions</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 07</span>
+                    <span class="card-title">Pub/Sub</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Animated fan-out from publisher through broker to subscribers. Kill/revive buttons for error isolation, delivery guarantee selector, queue depth indicators.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">fan-out</span>
+                        <span class="tag tag-interactive">kill subscriber</span>
+                        <span class="tag tag-chart">queue depth</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch08_stateful_vs_stateless/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <text x="85" y="15" text-anchor="middle" fill="#7ee787" font-size="9">Stateless ✓</text>
+                        <text x="255" y="15" text-anchor="middle" fill="#f47067" font-size="9">Stateful ✗</text>
+                        <line x1="170" y1="5" x2="170" y2="115" stroke="#21262d" stroke-width="1"/>
+                        <rect x="50" y="25" width="30" height="25" rx="3" fill="none" stroke="#7ee787" stroke-width="1"/>
+                        <rect x="90" y="25" width="30" height="25" rx="3" fill="none" stroke="#7ee787" stroke-width="1"/>
+                        <rect x="220" y="25" width="30" height="25" rx="3" fill="none" stroke="#f47067" stroke-width="1"/>
+                        <rect x="260" y="25" width="30" height="25" rx="3" fill="none" stroke="#f47067" stroke-width="1"/>
+                        <circle cx="225" cy="35" r="3" fill="#ffa657"/><circle cx="235" cy="35" r="3" fill="#ffa657"/>
+                        <text x="85" y="72" text-anchor="middle" fill="#7ee787" font-size="8">Any server works</text>
+                        <text x="255" y="72" text-anchor="middle" fill="#f47067" font-size="8">Wrong server = fail</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 08</span>
+                    <span class="card-title">Stateful vs Stateless</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Load balancer with two servers. Toggle stateful/stateless to see requests succeed or fail. Add/remove/kill server buttons demonstrate scaling behavior.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-interactive">toggle mode</span>
+                        <span class="tag tag-interactive">kill server</span>
+                        <span class="tag tag-comparison">side-by-side</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch09_multiplexing/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <rect x="20" y="20" width="100" height="80" rx="4" fill="none" stroke="#21262d" stroke-width="1"/>
+                        <rect x="25" y="25" width="90" height="20" rx="3" fill="#58a6ff22" stroke="#58a6ff" stroke-width="0.5"/>
+                        <text x="70" y="39" text-anchor="middle" fill="#58a6ff" font-size="8">Chat (stream 1)</text>
+                        <rect x="25" y="50" width="90" height="20" rx="3" fill="#7ee78722" stroke="#7ee787" stroke-width="0.5"/>
+                        <text x="70" y="64" text-anchor="middle" fill="#7ee787" font-size="8">Orders (stream 2)</text>
+                        <rect x="25" y="75" width="90" height="20" rx="3" fill="#ffa65722" stroke="#ffa657" stroke-width="0.5"/>
+                        <text x="70" y="89" text-anchor="middle" fill="#ffa657" font-size="8">Location (stream 3)</text>
+                        <line x1="125" y1="55" x2="200" y2="55" stroke="#d2a8ff" stroke-width="3" stroke-linecap="round"/>
+                        <text x="163" y="50" text-anchor="middle" fill="#d2a8ff" font-size="8">1 conn</text>
+                        <rect x="205" y="40" width="60" height="30" rx="4" fill="none" stroke="#d2a8ff" stroke-width="1.5"/>
+                        <text x="235" y="59" text-anchor="middle" fill="#d2a8ff" font-size="9">Server</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 09</span>
+                    <span class="card-title">Multiplexing</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Color-coded streams (blue/green/orange) interleaved through a single connection pipe. Frame inspector with hex headers, connection count comparison.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">interleaved streams</span>
+                        <span class="tag tag-protocol">frame inspector</span>
+                        <span class="tag tag-chart">resource comparison</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch10_sidecar/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <text x="50" y="20" text-anchor="middle" fill="#8b949e" font-size="9">Client</text>
+                        <rect x="110" y="30" width="120" height="60" rx="4" fill="none" stroke="#ffa657" stroke-width="1" stroke-dasharray="4,3"/>
+                        <text x="170" y="27" text-anchor="middle" fill="#ffa657" font-size="8">Pod</text>
+                        <rect x="115" y="35" width="50" height="50" rx="3" fill="none" stroke="#d2a8ff" stroke-width="1.5"/>
+                        <text x="140" y="57" text-anchor="middle" fill="#d2a8ff" font-size="7">Sidecar</text>
+                        <text x="140" y="67" text-anchor="middle" fill="#d2a8ff" font-size="6">auth+log</text>
+                        <rect x="175" y="35" width="50" height="50" rx="3" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+                        <text x="200" y="57" text-anchor="middle" fill="#7ee787" font-size="7">Service</text>
+                        <text x="200" y="67" text-anchor="middle" fill="#7ee787" font-size="6">business</text>
+                        <line x1="70" y1="60" x2="110" y2="60" stroke="#58a6ff" stroke-width="1.5"/>
+                        <line x1="165" y1="60" x2="175" y2="60" stroke="#ffa657" stroke-width="1"/>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 10</span>
+                    <span class="card-title">Sidecar Pattern</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Request flowing through sidecar proxy with step indicators (auth, rate-limit, log, forward). Token bucket visualization, burst/unauthorized demos.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">request flow</span>
+                        <span class="tag tag-interactive">rate limiter</span>
+                        <span class="tag tag-comparison">with vs without</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="chapters/ch11_synthesis/visual.html">
+                <div class="card-preview">
+                    <svg viewBox="0 0 340 120">
+                        <text x="170" y="20" text-anchor="middle" fill="#f0f6fc" font-size="11" font-weight="bold">Decision Framework</text>
+                        <text x="170" y="40" text-anchor="middle" fill="#ffa657" font-size="9">Full Architecture + Constraint Heatmap</text>
+                        <rect x="40" y="55" width="260" height="50" rx="4" fill="none" stroke="#21262d" stroke-width="1"/>
+                        <rect x="45" y="60" width="30" height="10" rx="2" fill="#7ee787"/><text x="80" y="69" fill="#8b949e" font-size="7">Low</text>
+                        <rect x="105" y="60" width="30" height="10" rx="2" fill="#ffa657"/><text x="140" y="69" fill="#8b949e" font-size="7">Med</text>
+                        <rect x="165" y="60" width="30" height="10" rx="2" fill="#f47067"/><text x="200" y="69" fill="#8b949e" font-size="7">High</text>
+                        <text x="170" y="95" text-anchor="middle" fill="#8b949e" font-size="8">Click any component to see its pattern</text>
+                    </svg>
+                </div>
+                <div class="card-header">
+                    <span class="card-chapter">Ch 11</span>
+                    <span class="card-title">Synthesis</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">The capstone: interactive architecture diagram, color-coded constraint heatmap, decision flowchart wizard, and side-by-side pattern comparison tool.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-interactive">clickable architecture</span>
+                        <span class="tag tag-chart">heatmap</span>
+                        <span class="tag tag-interactive">decision wizard</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="section-title">Appendices</div>
+        <div class="grid">
+            <a class="card" href="appendices/appendix_a_grpc/visual.html">
+                <div class="card-header">
+                    <span class="card-chapter">App A</span>
+                    <span class="card-title">gRPC / Protocol Buffers</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">REST/JSON vs gRPC/Protobuf payload comparison, four RPC pattern animations (unary, server/client/bidirectional streaming), HTTP/2 multiplexing.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-comparison">REST vs gRPC</span>
+                        <span class="tag tag-animation">4 RPC patterns</span>
+                        <span class="tag tag-chart">size comparison</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="appendices/appendix_b_message_queues/visual.html">
+                <div class="card-header">
+                    <span class="card-chapter">App B</span>
+                    <span class="card-title">Message Queues vs Pub/Sub</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Split view: queue (competing consumers) vs pub/sub (fan-out). Kafka partition simulation with consumer groups, rebalancing, and system comparison charts.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-comparison">queue vs pub/sub</span>
+                        <span class="tag tag-interactive">add/remove consumers</span>
+                        <span class="tag tag-chart">throughput comparison</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="appendices/appendix_c_graphql_subscriptions/visual.html">
+                <div class="card-header">
+                    <span class="card-chapter">App C</span>
+                    <span class="card-title">GraphQL Subscriptions</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">REST (3 requests) vs GraphQL (1 query) animation, interactive query builder with field selection, subscription stream with typed WebSocket events.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-comparison">REST vs GraphQL</span>
+                        <span class="tag tag-interactive">query builder</span>
+                        <span class="tag tag-animation">subscription stream</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="card" href="appendices/appendix_d_resilience/visual.html">
+                <div class="card-header">
+                    <span class="card-chapter">App D</span>
+                    <span class="card-title">Retry, Circuit Breaker, Backoff</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">Backoff timeline with jitter toggle, circuit breaker state machine animation, retry amplification chain, and timeout cascade visualizer.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-animation">state machine</span>
+                        <span class="tag tag-interactive">fail service</span>
+                        <span class="tag tag-chart">amplification</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="section-title">Bonus: Restaurant Dashboard</div>
+        <div class="grid">
+            <a class="card" href="chapters/ch04_server_sent_events/dashboard.html">
+                <div class="card-header">
+                    <span class="card-chapter">Ch 04</span>
+                    <span class="card-title">Live Restaurant Dashboard</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">A functional restaurant dashboard using the native EventSource API. Live order cards, connection state indicator, raw SSE protocol inspector. Requires the Ch04 server running.</div>
+                    <div class="card-tags">
+                        <span class="tag tag-interactive">live demo</span>
+                        <span class="tag tag-protocol">EventSource API</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="note">
+            All visuals are self-contained HTML+CSS+JS — no build step, no server required (except the Ch04 dashboard).<br>
+            Open any <code>visual.html</code> directly in your browser: <code>open chapters/ch01_request_response/visual.html</code>
+        </div>
+    </div>
+</body>
+</html>

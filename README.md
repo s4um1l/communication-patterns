@@ -82,6 +82,19 @@ uv sync --all-extras         # Everything
 - Basic understanding of HTTP (we'll deepen this in Ch 00)
 - Curiosity about why systems are built the way they are
 
+## Appendices
+
+Beyond the core narrative, four appendices cover patterns that don't fit the linear progression but are essential in practice:
+
+- **[Appendix A: gRPC / Protocol Buffers](appendices/appendix_a_grpc/README.md)** — Binary serialization + HTTP/2 transport. Four RPC patterns (unary, server/client/bidirectional streaming).
+- **[Appendix B: Message Queues vs Pub/Sub](appendices/appendix_b_message_queues/README.md)** — Redis vs RabbitMQ vs Kafka. Competing consumers, exactly-once delivery, partition-based ordering.
+- **[Appendix C: GraphQL Subscriptions](appendices/appendix_c_graphql_subscriptions/README.md)** — Schema-driven queries + WebSocket-based real-time subscriptions.
+- **[Appendix D: Retry, Circuit Breaker, Backoff](appendices/appendix_d_resilience/README.md)** — What happens when patterns fail. Exponential backoff, circuit breaker state machine, retry budgets, idempotency keys.
+
+## Browse All Visuals
+
+Every chapter and appendix includes an interactive `visual.html`. Open the **[Visual Index](visuals.html)** to browse them all in one place, or see the **[Glossary](GLOSSARY.md)** for quick definitions of terms used across chapters.
+
 ## Project Structure
 
 ```
@@ -89,8 +102,11 @@ shared/              FoodDash domain models — same business, evolving patterns
 chapters/
   ch00_foundations/   TCP and HTTP from raw sockets
   ch01_..ch11_../    One pattern per chapter, each building on the last
+appendices/          gRPC, message queues, GraphQL, resilience patterns
 exercises/           Per-chapter exercises with solutions
 benchmarks/          Comparative benchmarks across patterns
+visuals.html         Index page linking all interactive visualizations
+GLOSSARY.md          Quick-reference for terms across all chapters
 ```
 
 ## The Constraints Lens

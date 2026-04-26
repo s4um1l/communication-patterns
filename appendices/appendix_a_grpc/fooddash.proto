@@ -1,0 +1,253 @@
+// FoodDash Protocol Buffer Definitions
+//
+// This .proto file defines the service contract for FoodDash's inter-service
+// communication using gRPC. It demonstrates all four gRPC communication patterns.
+//
+// In production, you would run:
+//   protoc --python_out=. --grpc_python_out=. fooddash.proto
+//
+// This generates:
+//   fooddash_pb2.py       — message classes (Order, Customer, MenuItem, etc.)
+//   fooddash_pb2_grpc.py  — service stubs and server base classes
+//
+// For this educational repo, we don't require grpcio — see grpc_demo.py for
+// pure-Python simulations of these concepts.
+
+syntax = "proto3";
+
+package fooddash;
+
+// ─────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────
+
+// Mirrors shared/models.py OrderStatus.
+// Field numbers are stable — never reuse them, even after deletion.
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;  // Proto3 requires a zero value
+  ORDER_STATUS_PLACED      = 1;
+  ORDER_STATUS_CONFIRMED   = 2;
+  ORDER_STATUS_PREPARING   = 3;
+  ORDER_STATUS_READY       = 4;
+  ORDER_STATUS_PICKED_UP   = 5;
+  ORDER_STATUS_EN_ROUTE    = 6;
+  ORDER_STATUS_DELIVERED   = 7;
+  ORDER_STATUS_CANCELLED   = 8;
+}
+
+// ─────────────────────────────────────────────────────────
+// Core Messages
+// ─────────────────────────────────────────────────────────
+
+// A single item on a restaurant's menu.
+// Compare with shared/models.py MenuItem — same fields, different encoding.
+// JSON: {"id": "item_01", "name": "Classic Burger", "price_cents": 899, "description": "..."}
+// Protobuf: ~30 bytes (no field names on wire, varint for price_cents)
+message MenuItem {
+  string id          = 1;
+  string name        = 2;
+  int32 price_cents  = 3;  // Store money as integers — same principle as Python model
+  string description = 4;
+}
+
+// A customer placing an order.
+message Customer {
+  string id      = 1;
+  string name    = 2;
+  string address = 3;
+}
+
+// A delivery driver.
+message Driver {
+  string id        = 1;
+  string name      = 2;
+  double latitude  = 3;  // 64-bit float — wire type 1 (8 bytes fixed)
+  double longitude = 4;
+  bool available   = 5;  // wire type 0 (varint, 1 byte)
+}
+
+// A restaurant with its menu.
+message Restaurant {
+  string id              = 1;
+  string name            = 2;
+  repeated MenuItem menu = 3;  // "repeated" = list/array in Protobuf
+}
+
+// An item within an order (menu item + quantity).
+message OrderItem {
+  MenuItem menu_item = 1;  // Nested message — wire type 2 (length-delimited)
+  int32 quantity     = 2;
+}
+
+// The core Order message — the heart of FoodDash.
+//
+// JSON representation: ~300 bytes
+// Protobuf representation: ~80 bytes
+//
+// The 4x size reduction comes from:
+//   - No field names (just 1-byte tags)
+//   - No quotes, braces, colons, commas
+//   - Varint encoding for small integers
+//   - No whitespace
+message Order {
+  string id            = 1;
+  Customer customer    = 2;
+  string restaurant_id = 3;
+  repeated OrderItem items = 4;
+  OrderStatus status   = 5;
+  string driver_id     = 6;   // Optional — empty string means no driver assigned
+  int64 created_at     = 7;   // Unix timestamp (seconds)
+  int64 updated_at     = 8;
+}
+
+// ─────────────────────────────────────────────────────────
+// RPC Request/Response Messages
+// ─────────────────────────────────────────────────────────
+
+// --- Unary RPC: PlaceOrder ---
+
+message PlaceOrderRequest {
+  Customer customer       = 1;
+  string restaurant_id    = 2;
+  repeated OrderItem items = 3;
+  string idempotency_key  = 4;  // Prevent double-orders (see Ch01)
+}
+
+message PlaceOrderResponse {
+  Order order             = 1;
+  string message          = 2;  // Human-readable confirmation
+}
+
+// --- Server-Streaming RPC: StreamOrderUpdates ---
+
+message OrderUpdateRequest {
+  string order_id = 1;
+}
+
+message OrderUpdate {
+  string order_id      = 1;
+  OrderStatus status   = 2;
+  int64 timestamp      = 3;   // When this status change occurred
+  string message       = 4;   // Human-readable update ("Your food is being prepared")
+  Driver driver        = 5;   // Populated when driver is assigned
+  int32 eta_seconds    = 6;   // Estimated time of arrival
+}
+
+// --- Client-Streaming RPC: BatchPlaceOrders ---
+// Client streams individual orders; server responds with a summary.
+
+message BatchOrderResponse {
+  int32 total_placed        = 1;
+  int32 total_failed        = 2;
+  repeated Order orders     = 3;
+  repeated string errors    = 4;  // Error messages for failed orders
+}
+
+// --- Bidirectional Streaming RPC: LiveChat ---
+
+message ChatMessage {
+  string sender_id   = 1;
+  string sender_name = 2;
+  string content     = 3;
+  int64 timestamp    = 4;
+  string order_id    = 5;  // Optional — context for the chat
+}
+
+// ─────────────────────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────────────────────
+
+// The OrderService demonstrates all four gRPC communication patterns.
+//
+// In production, you might split this into multiple services:
+//   - OrderService (PlaceOrder, BatchPlaceOrders)
+//   - OrderTrackingService (StreamOrderUpdates)
+//   - SupportService (LiveChat)
+//
+// We combine them here for educational clarity.
+
+service OrderService {
+
+  // Pattern 1: Unary RPC (Request-Response)
+  // ────────────────────────────────────────
+  // Client sends one request, server sends one response.
+  // This is like Ch01 request-response, but:
+  //   - Binary Protobuf instead of JSON (~4x smaller)
+  //   - HTTP/2 instead of HTTP/1.1 (multiplexed, header-compressed)
+  //   - Typed — compiler catches mismatched fields
+  //
+  // Equivalent REST: POST /orders
+  rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+
+  // Pattern 2: Server-Streaming RPC
+  // ────────────────────────────────
+  // Client sends one request, server sends a stream of responses.
+  // This is like Ch04 SSE (Server-Sent Events), but:
+  //   - Binary Protobuf instead of text/event-stream
+  //   - Typed messages instead of raw strings
+  //   - Built-in flow control (backpressure)
+  //   - gRPC status codes instead of HTTP status codes
+  //
+  // Equivalent REST: GET /orders/{id}/stream (SSE)
+  rpc StreamOrderUpdates(OrderUpdateRequest) returns (stream OrderUpdate);
+
+  // Pattern 3: Client-Streaming RPC
+  // ────────────────────────────────
+  // Client sends a stream of requests, server sends one response.
+  // NO direct HTTP equivalent! This pattern doesn't exist in REST/HTTP.
+  //
+  // Use case: A catering company places 50 orders at once.
+  // Instead of 50 separate POST requests (50 round trips) or one
+  // massive JSON array (memory spike), the client streams orders
+  // one at a time. The server processes each as it arrives.
+  //
+  // The server responds once when the client closes the stream.
+  rpc BatchPlaceOrders(stream PlaceOrderRequest) returns (BatchOrderResponse);
+
+  // Pattern 4: Bidirectional Streaming RPC
+  // ───────────────────────────────────────
+  // Both sides send streams of messages independently.
+  // This is like Ch05 WebSockets, but:
+  //   - Typed Protobuf messages instead of raw text/binary frames
+  //   - gRPC interceptors for auth, logging, metrics
+  //   - Deadline propagation across the call chain
+  //   - HTTP/2 stream-level flow control
+  //
+  // Use case: Customer support live chat tied to a specific order.
+  //
+  // Equivalent REST: WebSocket at /ws/chat
+  rpc LiveChat(stream ChatMessage) returns (stream ChatMessage);
+}
+
+// ─────────────────────────────────────────────────────────
+// Health Check (standard gRPC protocol)
+// ─────────────────────────────────────────────────────────
+
+// This is the standard gRPC health checking protocol.
+// Kubernetes, Envoy, and other infrastructure tools understand
+// this natively — no custom /health endpoints needed.
+
+service Health {
+  // Synchronous health check — load balancer calls this periodically.
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Streaming health check — load balancer subscribes to status changes.
+  // More efficient than polling: the server pushes when status changes.
+  rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+}
+
+message HealthCheckRequest {
+  // Empty string = check the overall server health.
+  // Service name = check a specific service (e.g., "fooddash.OrderService").
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN         = 0;
+    SERVING         = 1;
+    NOT_SERVING     = 2;
+    SERVICE_UNKNOWN = 3;  // The requested service name doesn't exist
+  }
+  ServingStatus status = 1;
+}
