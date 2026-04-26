@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 00 -- TCP &amp; HTTP Visualized</title>
+<style>
+  /* ------------------------------------------------------------------ */
+  /* Base                                                                */
+  /* ------------------------------------------------------------------ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    text-align: center;
+    padding: 32px 20px 8px;
+    font-size: 24px;
+    color: #58a6ff;
+    font-weight: 600;
+  }
+
+  h1 span { color: #f0883e; }
+
+  .subtitle {
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Layout                                                              */
+  /* ------------------------------------------------------------------ */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  .section {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .section-header {
+    padding: 12px 20px;
+    background: #1c2128;
+    border-bottom: 1px solid #30363d;
+    font-weight: 600;
+    color: #58a6ff;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-body { padding: 20px; }
+
+  /* ------------------------------------------------------------------ */
+  /* Animation Canvas                                                    */
+  /* ------------------------------------------------------------------ */
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 520px;
+    background: #0d1117;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  /* Columns for Client / Network / Server */
+  .column-label {
+    position: absolute;
+    top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b949e;
+  }
+
+  .col-client  { left: 100px; }
+  .col-server  { right: 88px; }
+
+  .column-line {
+    position: absolute;
+    top: 32px;
+    bottom: 0;
+    width: 2px;
+    background: #21262d;
+  }
+
+  .line-client { left: 130px; }
+  .line-server { right: 118px; }
+
+  /* Packet (animated arrow between columns) */
+  .packet {
+    position: absolute;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 0 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    transition: none;
+  }
+
+  .packet.right-arrow {
+    /* Client -> Server */
+    border-top-right-radius: 13px;
+    border-bottom-right-radius: 13px;
+  }
+
+  .packet.left-arrow {
+    /* Server -> Client */
+    border-top-left-radius: 13px;
+    border-bottom-left-radius: 13px;
+  }
+
+  /* Packet colors */
+  .pkt-syn       { background: #1f6feb; color: #fff; }
+  .pkt-synack    { background: #238636; color: #fff; }
+  .pkt-ack       { background: #8b949e; color: #fff; }
+  .pkt-http-req  { background: #f0883e; color: #fff; }
+  .pkt-http-resp { background: #a371f7; color: #fff; }
+  .pkt-tls       { background: #f778ba; color: #fff; }
+  .pkt-fin       { background: #da3633; color: #fff; }
+
+  /* Timestamp labels on the side */
+  .ts-label {
+    position: absolute;
+    left: 8px;
+    font-size: 10px;
+    color: #484f58;
+    width: 80px;
+    text-align: right;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Controls                                                            */
+  /* ------------------------------------------------------------------ */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  button {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  button:hover {
+    background: #30363d;
+    border-color: #58a6ff;
+  }
+
+  button:active { background: #388bfd26; }
+
+  button.primary {
+    background: #1f6feb;
+    border-color: #1f6feb;
+    color: #fff;
+  }
+
+  button.primary:hover { background: #388bfd; }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    color: #8b949e;
+    font-size: 12px;
+  }
+
+  .speed-control input[type="range"] {
+    width: 100px;
+    accent-color: #58a6ff;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Latency Breakdown Bars                                              */
+  /* ------------------------------------------------------------------ */
+  .latency-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .latency-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .latency-label {
+    width: 80px;
+    text-align: right;
+    font-size: 12px;
+    color: #8b949e;
+    flex-shrink: 0;
+  }
+
+  .latency-bar-wrap {
+    flex: 1;
+    height: 28px;
+    background: #21262d;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .latency-bar {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    width: 0;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bar-dns  { background: #f0883e; }
+  .bar-tcp  { background: #1f6feb; }
+  .bar-tls  { background: #f778ba; }
+  .bar-http { background: #a371f7; }
+
+  .latency-ms {
+    width: 60px;
+    text-align: left;
+    font-size: 12px;
+    color: #58a6ff;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .latency-total {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #58a6ff;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Log area                                                            */
+  /* ------------------------------------------------------------------ */
+  .log {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 12px 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .log-entry { display: block; }
+  .log-time  { color: #484f58; }
+  .log-syn   { color: #58a6ff; }
+  .log-ack   { color: #8b949e; }
+  .log-http  { color: #f0883e; }
+  .log-tls   { color: #f778ba; }
+  .log-info  { color: #3fb950; }
+  .log-err   { color: #f85149; }
+
+  /* ------------------------------------------------------------------ */
+  /* RTT selector                                                       */
+  /* ------------------------------------------------------------------ */
+  .rtt-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .rtt-selector label {
+    font-size: 12px;
+    color: #8b949e;
+  }
+
+  .rtt-option {
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #8b949e;
+    transition: all 0.15s;
+  }
+
+  .rtt-option:hover { border-color: #58a6ff; color: #c9d1d9; }
+
+  .rtt-option.active {
+    background: #1f6feb;
+    border-color: #1f6feb;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<h1>Chapter 00 <span>|</span> TCP &amp; HTTP Visualized</h1>
+<p class="subtitle">Interactive animation of what happens when two computers talk</p>
+
+<div class="container">
+
+  <!-- ================================================================ -->
+  <!-- SECTION 1: TCP + HTTP Animation                                  -->
+  <!-- ================================================================ -->
+  <div class="section">
+    <div class="section-header">TCP 3-Way Handshake + HTTP Request</div>
+    <div class="section-body">
+
+      <div class="controls">
+        <button class="primary" id="btn-handshake">TCP Handshake</button>
+        <button id="btn-http">Send HTTP Request</button>
+        <button id="btn-tls">TLS Handshake</button>
+        <button id="btn-full">Full Sequence</button>
+        <button id="btn-reset">Reset</button>
+        <div class="speed-control">
+          <label>Speed:</label>
+          <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1">
+          <span id="speed-val">1x</span>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvas">
+        <span class="column-label col-client">Client</span>
+        <span class="column-label col-server">Server</span>
+        <div class="column-line line-client"></div>
+        <div class="column-line line-server"></div>
+      </div>
+
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- SECTION 2: Latency Breakdown                                     -->
+  <!-- ================================================================ -->
+  <div class="section">
+    <div class="section-header">Latency Breakdown: First HTTP Request</div>
+    <div class="section-body">
+
+      <div class="rtt-selector">
+        <label>Scenario:</label>
+        <div class="rtt-option active" data-rtt="15"  data-dns="5">Same Region (15ms RTT)</div>
+        <div class="rtt-option"        data-rtt="30"  data-dns="20">Cross-Country (30ms RTT)</div>
+        <div class="rtt-option"        data-rtt="75"  data-dns="40">Cross-Atlantic (75ms RTT)</div>
+        <div class="rtt-option"        data-rtt="150" data-dns="60">US to India (150ms RTT)</div>
+      </div>
+
+      <div class="latency-chart" id="latency-chart">
+        <div class="latency-row">
+          <span class="latency-label">DNS</span>
+          <div class="latency-bar-wrap"><div class="latency-bar bar-dns" id="bar-dns"></div></div>
+          <span class="latency-ms" id="ms-dns">--</span>
+        </div>
+        <div class="latency-row">
+          <span class="latency-label">TCP</span>
+          <div class="latency-bar-wrap"><div class="latency-bar bar-tcp" id="bar-tcp"></div></div>
+          <span class="latency-ms" id="ms-tcp">--</span>
+        </div>
+        <div class="latency-row">
+          <span class="latency-label">TLS 1.3</span>
+          <div class="latency-bar-wrap"><div class="latency-bar bar-tls" id="bar-tls"></div></div>
+          <span class="latency-ms" id="ms-tls">--</span>
+        </div>
+        <div class="latency-row">
+          <span class="latency-label">HTTP</span>
+          <div class="latency-bar-wrap"><div class="latency-bar bar-http" id="bar-http"></div></div>
+          <span class="latency-ms" id="ms-http">--</span>
+        </div>
+      </div>
+
+      <div class="latency-total" id="latency-total">Select a scenario above</div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================================== -->
+<!-- SCRIPT                                                             -->
+<!-- ================================================================== -->
+<script>
+(function () {
+  "use strict";
+
+  // ---- DOM refs ----
+  const canvas     = document.getElementById("canvas");
+  const logEl      = document.getElementById("log");
+  const speedInput = document.getElementById("speed");
+  const speedVal   = document.getElementById("speed-val");
+
+  // ---- State ----
+  let animQueue = [];
+  let animRunning = false;
+  let packetIdCounter = 0;
+
+  // Column X positions (relative to canvas)
+  // We compute them from the CSS so they stay in sync.
+  const CLIENT_X  = 131;   // left edge of client column line
+  const SERVER_X_OFFSET = 119; // right offset of server column line
+
+  function serverX() {
+    return canvas.offsetWidth - SERVER_X_OFFSET;
+  }
+
+  function speed() {
+    return parseFloat(speedInput.value) || 1;
+  }
+
+  speedInput.addEventListener("input", () => {
+    speedVal.textContent = speed() + "x";
+  });
+
+  // ---- Logging ----
+  function log(cls, text) {
+    const t = new Date().toLocaleTimeString("en-US", { hour12: false });
+    const entry = document.createElement("span");
+    entry.className = "log-entry";
+    entry.innerHTML = `<span class="log-time">${t}</span> <span class="log-${cls}">${text}</span>`;
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearLog() {
+    logEl.innerHTML = "";
+  }
+
+  // ---- Packet animation ----
+  // Each "step" is an object: { label, cls, direction, y, delay, logCls, logText }
+  // direction: "right" (client->server) or "left" (server->client)
+
+  function clearPackets() {
+    canvas.querySelectorAll(".packet, .ts-label").forEach(el => el.remove());
+  }
+
+  function animatePacket(step) {
+    return new Promise(resolve => {
+      const pkt = document.createElement("div");
+      const id = "pkt-" + (++packetIdCounter);
+      pkt.id = id;
+      pkt.className = `packet ${step.direction === "right" ? "right-arrow" : "left-arrow"} ${step.cls}`;
+      pkt.textContent = step.label;
+
+      const sx = serverX();
+
+      // Start and end positions
+      let startX, endX;
+      if (step.direction === "right") {
+        startX = CLIENT_X + 2;
+        endX = sx - 2;
+      } else {
+        startX = sx - 2;
+        endX = CLIENT_X + 2;
+      }
+
+      const width = 140;
+      pkt.style.width = width + "px";
+      pkt.style.top = step.y + "px";
+
+      if (step.direction === "right") {
+        pkt.style.left = startX + "px";
+      } else {
+        pkt.style.left = (startX - width) + "px";
+      }
+
+      canvas.appendChild(pkt);
+
+      // Timestamp label
+      const tsLabel = document.createElement("div");
+      tsLabel.className = "ts-label";
+      tsLabel.style.top = (step.y + 4) + "px";
+      tsLabel.textContent = step.tsText || "";
+      canvas.appendChild(tsLabel);
+
+      // Animate in
+      const duration = (500 / speed());
+
+      requestAnimationFrame(() => {
+        pkt.style.transition = `left ${duration}ms linear, opacity 150ms ease`;
+        pkt.style.opacity = "1";
+        tsLabel.style.transition = "opacity 200ms ease";
+        tsLabel.style.opacity = "1";
+
+        requestAnimationFrame(() => {
+          if (step.direction === "right") {
+            pkt.style.left = (endX - width) + "px";
+          } else {
+            pkt.style.left = endX + "px";
+          }
+        });
+      });
+
+      if (step.logCls && step.logText) {
+        log(step.logCls, step.logText);
+      }
+
+      setTimeout(resolve, duration + 80);
+    });
+  }
+
+  async function runSequence(steps) {
+    if (animRunning) return;
+    animRunning = true;
+
+    for (const step of steps) {
+      if (step.pause) {
+        await new Promise(r => setTimeout(r, step.pause / speed()));
+        continue;
+      }
+      await animatePacket(step);
+    }
+
+    animRunning = false;
+  }
+
+  // ---- Step definitions ----
+  const Y_START = 55;
+  const Y_STEP  = 52;
+
+  function tcpHandshakeSteps(yOff) {
+    const y = yOff || Y_START;
+    return [
+      { label: "SYN  seq=x",       cls: "pkt-syn",    direction: "right", y: y,              tsText: "0 ms",     logCls: "syn",  logText: "Client -> SYN (seq=x)  |  State: SYN_SENT" },
+      { label: "SYN-ACK  seq=y",   cls: "pkt-synack", direction: "left",  y: y + Y_STEP,     tsText: "1 RTT",    logCls: "syn",  logText: "Server -> SYN-ACK (seq=y, ack=x+1)  |  State: SYN_RECEIVED" },
+      { label: "ACK  ack=y+1",     cls: "pkt-ack",    direction: "right", y: y + Y_STEP * 2, tsText: "1.5 RTT",  logCls: "ack",  logText: "Client -> ACK (ack=y+1)  |  Both sides: ESTABLISHED" },
+    ];
+  }
+
+  function tlsSteps(yOff) {
+    const y = yOff || Y_START;
+    return [
+      { label: "ClientHello + Key", cls: "pkt-tls",    direction: "right", y: y,              tsText: "",         logCls: "tls",  logText: "Client -> ClientHello + ECDHE key_share + cipher suites" },
+      { label: "ServerHello + Cert", cls: "pkt-tls",   direction: "left",  y: y + Y_STEP,     tsText: "+1 RTT",   logCls: "tls",  logText: "Server -> ServerHello + key_share + Certificate + Finished" },
+      { label: "Finished",          cls: "pkt-tls",    direction: "right", y: y + Y_STEP * 2, tsText: "",         logCls: "tls",  logText: "Client -> Finished  |  TLS 1.3 handshake complete (1 RTT)" },
+    ];
+  }
+
+  function httpSteps(yOff) {
+    const y = yOff || Y_START;
+    return [
+      { label: "GET /menu HTTP/1.1", cls: "pkt-http-req",  direction: "right", y: y,          tsText: "",         logCls: "http", logText: "Client -> GET /api/v1/restaurants/42/menu HTTP/1.1" },
+      { pause: 200 },
+      { label: "200 OK  {json...}",  cls: "pkt-http-resp", direction: "left",  y: y + Y_STEP, tsText: "+1 RTT",   logCls: "http", logText: 'Server -> HTTP/1.1 200 OK  {"menu": [...]}' },
+    ];
+  }
+
+  // ---- Button handlers ----
+  document.getElementById("btn-handshake").addEventListener("click", () => {
+    clearPackets(); clearLog();
+    log("info", "Starting TCP 3-way handshake...");
+    runSequence(tcpHandshakeSteps(Y_START));
+  });
+
+  document.getElementById("btn-http").addEventListener("click", () => {
+    clearPackets(); clearLog();
+    log("info", "Sending HTTP request (assuming TCP already established)...");
+    runSequence(httpSteps(Y_START));
+  });
+
+  document.getElementById("btn-tls").addEventListener("click", () => {
+    clearPackets(); clearLog();
+    log("info", "Starting TLS 1.3 handshake (assumes TCP already established)...");
+    runSequence(tlsSteps(Y_START));
+  });
+
+  document.getElementById("btn-full").addEventListener("click", () => {
+    clearPackets(); clearLog();
+    log("info", "Full sequence: TCP handshake -> TLS 1.3 -> HTTP request...");
+
+    const tcpY = Y_START;
+    const tlsY = tcpY + Y_STEP * 3 + 10;
+    const httpY = tlsY + Y_STEP * 3 + 10;
+
+    const steps = [
+      ...tcpHandshakeSteps(tcpY),
+      { pause: 300 },
+      ...tlsSteps(tlsY).map(s => {
+        if (s.pause) return s;
+        return { ...s, logText: s.logText };
+      }),
+      { pause: 300 },
+      ...httpSteps(httpY),
+    ];
+
+    // Update timestamps for full sequence
+    steps.forEach((s, i) => {
+      if (s.pause) return;
+      // We will keep the relative labels as they are -- they are educational
+    });
+
+    runSequence(steps);
+  });
+
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    clearPackets();
+    clearLog();
+    animRunning = false;
+    log("info", "Canvas reset. Click a button to start an animation.");
+  });
+
+  // ---- Latency Breakdown ----
+  const rttOptions = document.querySelectorAll(".rtt-option");
+
+  function updateLatency(rtt, dns) {
+    const tcp = rtt;        // 1 RTT
+    const tls = rtt;        // 1 RTT (TLS 1.3)
+    const http = rtt;       // 1 RTT
+    const total = dns + tcp + tls + http;
+
+    // Max for scaling
+    const maxMs = total;
+
+    function pct(ms) {
+      return Math.max(5, (ms / maxMs) * 100);
+    }
+
+    // Animate bars
+    requestAnimationFrame(() => {
+      document.getElementById("bar-dns").style.width  = pct(dns)  + "%";
+      document.getElementById("bar-tcp").style.width  = pct(tcp)  + "%";
+      document.getElementById("bar-tls").style.width  = pct(tls)  + "%";
+      document.getElementById("bar-http").style.width = pct(http) + "%";
+
+      document.getElementById("ms-dns").textContent  = dns  + " ms";
+      document.getElementById("ms-tcp").textContent  = tcp  + " ms";
+      document.getElementById("ms-tls").textContent  = tls  + " ms";
+      document.getElementById("ms-http").textContent = http + " ms";
+
+      document.getElementById("latency-total").textContent =
+        `Total: ${total} ms  (${(total / rtt).toFixed(1)} RTTs)  --  With keep-alive: ${http} ms`;
+    });
+  }
+
+  rttOptions.forEach(opt => {
+    opt.addEventListener("click", () => {
+      rttOptions.forEach(o => o.classList.remove("active"));
+      opt.classList.add("active");
+      updateLatency(
+        parseInt(opt.dataset.rtt, 10),
+        parseInt(opt.dataset.dns, 10)
+      );
+    });
+  });
+
+  // Initialize with first option
+  updateLatency(15, 5);
+
+  // Initial log message
+  log("info", "Ready. Click a button above to start an animation.");
+
+})();
+</script>
+</body>
+</html>

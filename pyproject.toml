@@ -1,0 +1,28 @@
+[project]
+name = "communication-patterns"
+version = "0.1.0"
+description = "Principal-level educational repo on communication patterns — from request-response to sidecars, built through an evolving food delivery case study"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "httpx>=0.28",
+    "pydantic>=2.10",
+]
+
+[project.optional-dependencies]
+websockets = ["websockets>=14.0"]
+sse = ["httpx-sse>=0.4", "sse-starlette>=2.0"]
+push = ["pywebpush>=2.0"]
+redis = ["redis>=5.0"]
+all = [
+    "communication-patterns[websockets,sse,push,redis]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
