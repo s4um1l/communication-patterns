@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ch10 -- Sidecar Pattern Visualization</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.6rem;
+            color: #58a6ff;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85rem;
+            margin-bottom: 32px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            color: #58a6ff;
+            margin-bottom: 16px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        button:hover { background: #30363d; border-color: #58a6ff; }
+        button.active { background: #58a6ff; color: #0d1117; border-color: #58a6ff; }
+        button.danger { border-color: #f85149; }
+        button.danger:hover { background: #f85149; color: #0d1117; }
+
+        /* Flow visualization */
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            min-height: 180px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .flow-node {
+            width: 150px;
+            min-height: 120px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px;
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s;
+        }
+
+        .flow-node.client {
+            background: #1a1a2e;
+            border: 2px solid #58a6ff;
+        }
+
+        .flow-node.sidecar {
+            background: #1a2e1a;
+            border: 2px solid #3fb950;
+            width: 180px;
+        }
+
+        .flow-node.service {
+            background: #2e1a1a;
+            border: 2px solid #d29922;
+        }
+
+        .flow-node .node-label {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .flow-node .node-detail {
+            font-size: 0.7rem;
+            color: #8b949e;
+            line-height: 1.4;
+        }
+
+        .flow-arrow {
+            width: 80px;
+            height: 4px;
+            background: #30363d;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .flow-arrow::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            border: 6px solid transparent;
+            border-left: 8px solid #30363d;
+        }
+
+        .flow-arrow.active {
+            background: #3fb950;
+        }
+
+        .flow-arrow.active::after {
+            border-left-color: #3fb950;
+        }
+
+        .flow-arrow.rejected {
+            background: #f85149;
+        }
+
+        .flow-arrow.rejected::after {
+            border-left-color: #f85149;
+        }
+
+        .arrow-label {
+            position: absolute;
+            top: -20px;
+            font-size: 0.65rem;
+            white-space: nowrap;
+            color: #8b949e;
+        }
+
+        /* Request animation */
+        .request-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            z-index: 10;
+            transition: none;
+        }
+
+        .request-dot.valid { background: #3fb950; box-shadow: 0 0 8px #3fb95066; }
+        .request-dot.invalid { background: #f85149; box-shadow: 0 0 8px #f8514966; }
+        .request-dot.limited { background: #d29922; box-shadow: 0 0 8px #d2992266; }
+
+        /* Step indicator */
+        .steps {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .step {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            transition: all 0.3s;
+        }
+
+        .step.active {
+            border-color: #3fb950;
+            color: #3fb950;
+            background: #0d1117;
+        }
+
+        .step.rejected {
+            border-color: #f85149;
+            color: #f85149;
+            background: #1a0a0a;
+        }
+
+        .step.complete {
+            border-color: #3fb950;
+            color: #8b949e;
+            background: #0a1a0a;
+        }
+
+        /* Comparison */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .comparison-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .comparison-box h3 {
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+
+        .comparison-box.without h3 { color: #f85149; }
+        .comparison-box.with h3 { color: #3fb950; }
+
+        .service-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 0.75rem;
+            border-bottom: 1px solid #161b22;
+        }
+
+        .service-row:last-child { border-bottom: none; }
+
+        .service-name {
+            width: 90px;
+            color: #58a6ff;
+            flex-shrink: 0;
+        }
+
+        .middleware-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.65rem;
+        }
+
+        .tag.auth { background: #3d1f00; color: #d29922; }
+        .tag.log { background: #0d2d4d; color: #58a6ff; }
+        .tag.rate { background: #3d0015; color: #f85149; }
+        .tag.biz { background: #0d3d0d; color: #3fb950; }
+        .tag.sidecar { background: #1a2e1a; color: #3fb950; border: 1px solid #3fb950; }
+
+        /* Rate limit viz */
+        .rate-limit-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .bucket-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bucket-label {
+            width: 100px;
+            font-size: 0.8rem;
+            text-align: right;
+            color: #8b949e;
+        }
+
+        .bucket-track {
+            flex: 1;
+            height: 28px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bucket-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            padding-left: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #0d1117;
+        }
+
+        .bucket-fill.healthy { background: #3fb950; }
+        .bucket-fill.warning { background: #d29922; }
+        .bucket-fill.depleted { background: #f85149; }
+
+        /* Log output */
+        .log-output {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-entry { margin: 2px 0; }
+        .log-entry.ok { color: #3fb950; }
+        .log-entry.blocked { color: #f85149; }
+        .log-entry.limited { color: #d29922; }
+        .log-entry .ts { color: #484f58; }
+
+        /* Stats */
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-top: 12px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .stat-number.ok { color: #3fb950; }
+        .stat-number.rejected { color: #f85149; }
+        .stat-number.limited { color: #d29922; }
+
+        .stat-desc {
+            font-size: 0.7rem;
+            color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 10 -- Sidecar Pattern</h1>
+    <p class="subtitle">Cross-cutting concerns extracted from business logic. Auth, logging, rate limiting in one proxy.</p>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="panel">
+            <div class="controls">
+                <button class="active" id="btn-valid" onclick="sendRequest('valid')">Send Valid Request</button>
+                <button class="danger" id="btn-invalid" onclick="sendRequest('invalid')">Send Without Auth</button>
+                <button onclick="sendRequest('burst')">Send Burst (15 requests)</button>
+                <button onclick="resetAll()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Request flow visualization -->
+        <div class="panel">
+            <div class="panel-title">Request Flow Through Sidecar</div>
+            <div class="flow-container" id="flow">
+                <div class="flow-node client">
+                    <div class="node-label">Client</div>
+                    <div class="node-detail">Sends request with<br>Authorization header</div>
+                </div>
+                <div class="flow-arrow" id="arrow1">
+                    <span class="arrow-label">port 8011</span>
+                </div>
+                <div class="flow-node sidecar" id="sidecar-node">
+                    <div class="node-label" style="color: #3fb950;">Sidecar Proxy</div>
+                    <div class="node-detail" id="sidecar-detail">
+                        1. Auth check<br>
+                        2. Rate limit<br>
+                        3. Log request<br>
+                        4. Forward
+                    </div>
+                </div>
+                <div class="flow-arrow" id="arrow2">
+                    <span class="arrow-label">localhost:8010</span>
+                </div>
+                <div class="flow-node service">
+                    <div class="node-label" style="color: #d29922;">Order Service</div>
+                    <div class="node-detail">Pure business logic<br>No middleware</div>
+                </div>
+            </div>
+            <div class="steps" id="steps">
+                <div class="step" id="step-auth">1. Auth Check</div>
+                <div class="step" id="step-rate">2. Rate Limit</div>
+                <div class="step" id="step-log">3. Log Request</div>
+                <div class="step" id="step-forward">4. Forward</div>
+                <div class="step" id="step-respond">5. Respond</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- Rate limit bucket -->
+            <div class="panel">
+                <div class="panel-title">Token Bucket (Rate Limiter)</div>
+                <div class="rate-limit-container">
+                    <div class="bucket-row">
+                        <span class="bucket-label">Tokens:</span>
+                        <div class="bucket-track">
+                            <div class="bucket-fill healthy" id="bucket-fill" style="width: 100%;">10 / 10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #8b949e; text-align: center; margin-top: 4px;">
+                        Refill rate: 2 tokens/sec | Max: 10 tokens
+                    </div>
+                </div>
+                <div class="stats-row">
+                    <div class="stat">
+                        <div class="stat-number ok" id="stat-passed">0</div>
+                        <div class="stat-desc">Passed</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number rejected" id="stat-rejected">0</div>
+                        <div class="stat-desc">Auth Rejected</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number limited" id="stat-limited">0</div>
+                        <div class="stat-desc">Rate Limited</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log output -->
+            <div class="panel">
+                <div class="panel-title">Sidecar Log Output</div>
+                <div class="log-output" id="log-output">
+                    <div class="log-entry" style="color: #484f58;">Waiting for requests...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison: with vs without sidecar -->
+        <div class="panel">
+            <div class="panel-title">5 Services: With vs Without Sidecar</div>
+            <div class="comparison-grid">
+                <div class="comparison-box without">
+                    <h3>Without Sidecar (duplicated middleware)</h3>
+                    <div class="service-row">
+                        <span class="service-name">Order Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag auth">auth</span>
+                            <span class="tag log">logging</span>
+                            <span class="tag rate">rate-limit</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Kitchen Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag auth">auth</span>
+                            <span class="tag log">logging</span>
+                            <span class="tag rate">rate-limit</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Billing Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag auth">auth</span>
+                            <span class="tag log">logging</span>
+                            <span class="tag rate">rate-limit</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Driver Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag auth">auth</span>
+                            <span class="tag log">logging</span>
+                            <span class="tag rate">rate-limit</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Notify Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag auth">auth</span>
+                            <span class="tag log">logging</span>
+                            <span class="tag rate">rate-limit</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.7rem; color: #f85149;">
+                        15 middleware copies. Change auth = 5 deploys.
+                    </div>
+                </div>
+                <div class="comparison-box with">
+                    <h3>With Sidecar (extracted middleware)</h3>
+                    <div class="service-row">
+                        <span class="service-name">Order Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag sidecar">sidecar</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Kitchen Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag sidecar">sidecar</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Billing Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag sidecar">sidecar</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Driver Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag sidecar">sidecar</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div class="service-row">
+                        <span class="service-name">Notify Svc</span>
+                        <div class="middleware-tags">
+                            <span class="tag sidecar">sidecar</span>
+                            <span class="tag biz">business</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.7rem; color: #3fb950;">
+                        1 sidecar binary. Change auth = 1 deploy. Services stay clean.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tokens = 10;
+        const MAX_TOKENS = 10;
+        const REFILL_RATE = 2; // per second
+        let statPassed = 0;
+        let statRejected = 0;
+        let statLimited = 0;
+        let requestId = 0;
+        let animating = false;
+
+        // Refill tokens over time
+        setInterval(() => {
+            if (tokens < MAX_TOKENS) {
+                tokens = Math.min(MAX_TOKENS, tokens + REFILL_RATE * 0.5);
+                updateBucket();
+            }
+        }, 500);
+
+        function updateBucket() {
+            const fill = document.getElementById('bucket-fill');
+            const pct = (tokens / MAX_TOKENS) * 100;
+            fill.style.width = pct + '%';
+            fill.textContent = `${Math.floor(tokens)} / ${MAX_TOKENS}`;
+
+            fill.className = 'bucket-fill ';
+            if (tokens > 5) fill.className += 'healthy';
+            else if (tokens > 2) fill.className += 'warning';
+            else fill.className += 'depleted';
+        }
+
+        function updateStats() {
+            document.getElementById('stat-passed').textContent = statPassed;
+            document.getElementById('stat-rejected').textContent = statRejected;
+            document.getElementById('stat-limited').textContent = statLimited;
+        }
+
+        function addLog(msg, cls) {
+            const log = document.getElementById('log-output');
+            const now = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${cls}`;
+            entry.innerHTML = `<span class="ts">[${now}]</span> ${msg}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearSteps() {
+            document.querySelectorAll('.step').forEach(s => {
+                s.className = 'step';
+            });
+            document.getElementById('arrow1').className = 'flow-arrow';
+            document.getElementById('arrow2').className = 'flow-arrow';
+        }
+
+        async function animateStep(stepId, cls, delayMs) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    document.getElementById(stepId).className = `step ${cls}`;
+                    resolve();
+                }, delayMs);
+            });
+        }
+
+        async function sendRequest(type) {
+            if (animating && type !== 'burst') return;
+
+            if (type === 'burst') {
+                for (let i = 0; i < 15; i++) {
+                    setTimeout(() => sendSingle('valid'), i * 150);
+                }
+                return;
+            }
+
+            await sendSingle(type);
+        }
+
+        async function sendSingle(type) {
+            requestId++;
+            const rid = requestId;
+            animating = true;
+            clearSteps();
+
+            // Arrow 1 lights up
+            document.getElementById('arrow1').className = 'flow-arrow active';
+
+            if (type === 'invalid') {
+                // Step 1: Auth check -- FAIL
+                await animateStep('step-auth', 'rejected', 300);
+                document.getElementById('arrow1').className = 'flow-arrow rejected';
+                addLog(`[${String(rid).padStart(4, '0')}] GET /orders --> 401 UNAUTHORIZED (no token)`, 'blocked');
+                statRejected++;
+                updateStats();
+                animating = false;
+                return;
+            }
+
+            // Step 1: Auth check -- pass
+            await animateStep('step-auth', 'complete', 300);
+
+            // Step 2: Rate limit check
+            if (tokens < 1) {
+                await animateStep('step-rate', 'rejected', 300);
+                document.getElementById('arrow1').className = 'flow-arrow rejected';
+                addLog(`[${String(rid).padStart(4, '0')}] GET /orders --> 429 RATE LIMITED`, 'limited');
+                statLimited++;
+                updateStats();
+                animating = false;
+                return;
+            }
+
+            tokens = Math.max(0, tokens - 1);
+            updateBucket();
+            await animateStep('step-rate', 'complete', 300);
+
+            // Step 3: Log
+            await animateStep('step-log', 'complete', 200);
+
+            // Step 4: Forward to service
+            document.getElementById('arrow2').className = 'flow-arrow active';
+            await animateStep('step-forward', 'active', 400);
+
+            // Step 5: Response
+            await animateStep('step-forward', 'complete', 200);
+            await animateStep('step-respond', 'complete', 200);
+
+            const latency = (1.5 + Math.random() * 2).toFixed(1);
+            addLog(
+                `[${String(rid).padStart(4, '0')}] GET /orders --> 200 [${latency}ms] ` +
+                `[rate-limit remaining: ${Math.floor(tokens)}/${MAX_TOKENS}]`,
+                'ok'
+            );
+            statPassed++;
+            updateStats();
+            animating = false;
+        }
+
+        function resetAll() {
+            tokens = MAX_TOKENS;
+            statPassed = 0;
+            statRejected = 0;
+            statLimited = 0;
+            requestId = 0;
+            animating = false;
+            updateBucket();
+            updateStats();
+            clearSteps();
+            document.getElementById('log-output').innerHTML =
+                '<div class="log-entry" style="color: #484f58;">Waiting for requests...</div>';
+        }
+    </script>
+</body>
+</html>

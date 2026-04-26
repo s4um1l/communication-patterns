@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ch09 -- Multiplexing / Demultiplexing Visualization</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.6rem;
+            color: #58a6ff;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85rem;
+            margin-bottom: 32px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            color: #58a6ff;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title .count {
+            background: #21262d;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+
+        /* Stream visualization */
+        .mux-viz {
+            grid-column: 1 / -1;
+            min-height: 320px;
+        }
+
+        .streams-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stream-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 48px;
+        }
+
+        .stream-label {
+            width: 120px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .stream-label.chat { color: #58a6ff; }
+        .stream-label.order { color: #3fb950; }
+        .stream-label.location { color: #d29922; }
+
+        .stream-pipe {
+            flex: 1;
+            height: 40px;
+            background: #21262d;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #30363d;
+        }
+
+        .mux-pipe {
+            border: 2px solid #bc8cff;
+            background: #1a1230;
+        }
+
+        .frame {
+            position: absolute;
+            height: 28px;
+            top: 5px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #0d1117;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 6px;
+        }
+
+        .frame:hover {
+            opacity: 0.8;
+            z-index: 10;
+        }
+
+        .frame.chat { background: #58a6ff; }
+        .frame.order { background: #3fb950; }
+        .frame.location { background: #d29922; }
+
+        /* Connection comparison */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .comparison-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .comparison-box h3 {
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .comparison-box.bad h3 { color: #f85149; }
+        .comparison-box.good h3 { color: #3fb950; }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #8b949e; }
+        .stat-value { font-weight: 600; }
+        .stat-value.bad { color: #f85149; }
+        .stat-value.good { color: #3fb950; }
+
+        /* Frame inspector */
+        .frame-inspector {
+            min-height: 200px;
+        }
+
+        .inspector-content {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            min-height: 160px;
+        }
+
+        .inspector-content .hint {
+            color: #484f58;
+            font-style: italic;
+        }
+
+        .hex-display {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: #161b22;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            border-left: 3px solid #30363d;
+        }
+
+        .hex-display.chat { border-left-color: #58a6ff; }
+        .hex-display.order { border-left-color: #3fb950; }
+        .hex-display.location { border-left-color: #d29922; }
+
+        .field { display: inline; }
+        .field-sid { color: #bc8cff; }
+        .field-type { color: #ff7b72; }
+        .field-len { color: #d2a8ff; }
+        .field-payload { color: #8b949e; }
+
+        /* Controls */
+        .controls {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        button:hover { background: #30363d; border-color: #58a6ff; }
+        button.active { background: #58a6ff; color: #0d1117; border-color: #58a6ff; }
+
+        .speed-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #8b949e;
+            font-size: 0.8rem;
+        }
+
+        /* Bandwidth chart */
+        .bandwidth-chart {
+            grid-column: 1 / -1;
+        }
+
+        .bar-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 8px 0;
+        }
+
+        .bar-label {
+            width: 160px;
+            text-align: right;
+            font-size: 0.8rem;
+            color: #8b949e;
+            flex-shrink: 0;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 24px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1s ease;
+            display: flex;
+            align-items: center;
+            padding-left: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #0d1117;
+        }
+
+        .bar-fill.bad { background: #f85149; }
+        .bar-fill.good { background: #3fb950; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 09 -- Multiplexing / Demultiplexing</h1>
+    <p class="subtitle">Three logical streams. One physical connection. Each frame tagged with a stream ID.</p>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="controls">
+            <button id="btn-play" class="active" onclick="startAnimation()">Play</button>
+            <button id="btn-pause" onclick="pauseAnimation()">Pause</button>
+            <button id="btn-reset" onclick="resetAnimation()">Reset</button>
+            <div class="speed-label">
+                Speed:
+                <button onclick="setSpeed(0.5)">0.5x</button>
+                <button onclick="setSpeed(1)" class="active" id="btn-speed-1">1x</button>
+                <button onclick="setSpeed(2)">2x</button>
+            </div>
+        </div>
+
+        <!-- Main visualization: separate streams merging into muxed pipe -->
+        <div class="panel mux-viz">
+            <div class="panel-title">
+                Multiplexed Connection
+                <span class="count" id="frame-counter">0 frames</span>
+            </div>
+            <div class="streams-container">
+                <div class="stream-row">
+                    <span class="stream-label chat">CHAT (id=1)</span>
+                    <div class="stream-pipe" id="pipe-chat"></div>
+                </div>
+                <div class="stream-row">
+                    <span class="stream-label order">ORDER (id=2)</span>
+                    <div class="stream-pipe" id="pipe-order"></div>
+                </div>
+                <div class="stream-row">
+                    <span class="stream-label location">LOCATION (id=3)</span>
+                    <div class="stream-pipe" id="pipe-location"></div>
+                </div>
+                <div class="stream-row" style="margin-top: 8px;">
+                    <span class="stream-label" style="color: #bc8cff;">MUX PIPE</span>
+                    <div class="stream-pipe mux-pipe" id="pipe-mux"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Frame Inspector -->
+        <div class="panel frame-inspector">
+            <div class="panel-title">Frame Inspector</div>
+            <div class="inspector-content" id="inspector">
+                <span class="hint">Click a frame to inspect its binary structure.</span>
+            </div>
+        </div>
+
+        <!-- Connection comparison -->
+        <div class="panel">
+            <div class="panel-title">Connection Comparison</div>
+            <div class="comparison">
+                <div class="comparison-box bad">
+                    <h3>Without Multiplexing</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Connections</span>
+                        <span class="stat-value bad">3 per user</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TCP Handshakes</span>
+                        <span class="stat-value bad">3</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TLS Handshakes</span>
+                        <span class="stat-value bad">3</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Socket Buffers</span>
+                        <span class="stat-value bad">261 KB</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Setup Time</span>
+                        <span class="stat-value bad">~750ms</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">@ 100K Users</span>
+                        <span class="stat-value bad">300K conns / 25 GB</span>
+                    </div>
+                </div>
+                <div class="comparison-box good">
+                    <h3>With Multiplexing</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Connections</span>
+                        <span class="stat-value good">1 per user</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TCP Handshakes</span>
+                        <span class="stat-value good">1</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TLS Handshakes</span>
+                        <span class="stat-value good">1</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Socket Buffers</span>
+                        <span class="stat-value good">87 KB</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Setup Time</span>
+                        <span class="stat-value good">~250ms</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">@ 100K Users</span>
+                        <span class="stat-value good">100K conns / 8.5 GB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bandwidth chart -->
+        <div class="panel bandwidth-chart">
+            <div class="panel-title">Resource Usage at 100K Users</div>
+            <div class="bar-container">
+                <span class="bar-label">Connections (3 sep.)</span>
+                <div class="bar-track">
+                    <div class="bar-fill bad" style="width: 100%;">300,000</div>
+                </div>
+            </div>
+            <div class="bar-container">
+                <span class="bar-label">Connections (muxed)</span>
+                <div class="bar-track">
+                    <div class="bar-fill good" style="width: 33%;">100,000</div>
+                </div>
+            </div>
+            <div class="bar-container" style="margin-top: 16px;">
+                <span class="bar-label">Socket Memory (3 sep.)</span>
+                <div class="bar-track">
+                    <div class="bar-fill bad" style="width: 100%;">25.5 GB</div>
+                </div>
+            </div>
+            <div class="bar-container">
+                <span class="bar-label">Socket Memory (muxed)</span>
+                <div class="bar-track">
+                    <div class="bar-fill good" style="width: 33%;">8.5 GB</div>
+                </div>
+            </div>
+            <div class="bar-container" style="margin-top: 16px;">
+                <span class="bar-label">Setup Latency (3 sep.)</span>
+                <div class="bar-track">
+                    <div class="bar-fill bad" style="width: 100%;">750ms</div>
+                </div>
+            </div>
+            <div class="bar-container">
+                <span class="bar-label">Setup Latency (muxed)</span>
+                <div class="bar-track">
+                    <div class="bar-fill good" style="width: 33%;">250ms</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Frame data matching the client.py sequence
+        const FRAMES = [
+            { id: 1, type: 'chat',     sid: 1, payload: '{"msg":"Hey, how far are you?"}',                    time: 0 },
+            { id: 2, type: 'order',    sid: 2, payload: '{"order_id":"order_mux_01","action":"check"}',        time: 400 },
+            { id: 3, type: 'location', sid: 3, payload: '{"driver_id":"drv_01","lat":40.713,"lng":-74.006}',   time: 800 },
+            { id: 4, type: 'chat',     sid: 1, payload: '{"msg":"I\'m at the lobby entrance"}',                time: 1400 },
+            { id: 5, type: 'location', sid: 3, payload: '{"driver_id":"drv_01","lat":40.7135,"lng":-74.0058}', time: 1800 },
+            { id: 6, type: 'order',    sid: 2, payload: '{"order_id":"order_mux_01","action":"advance"}',      time: 2200 },
+            { id: 7, type: 'location', sid: 3, payload: '{"driver_id":"drv_01","lat":40.714,"lng":-74.0055}',  time: 2500 },
+            { id: 8, type: 'location', sid: 3, payload: '{"driver_id":"drv_01","lat":40.7145,"lng":-74.005}',  time: 2700 },
+            { id: 9, type: 'order',    sid: 2, payload: '{"order_id":"order_mux_01","action":"check"}',        time: 3100 },
+            { id: 10, type: 'chat',    sid: 1, payload: '{"msg":"Great, I can see you!"}',                     time: 3600 },
+        ];
+
+        const TYPE_BYTE = { chat: 1, order: 2, location: 3 };
+        const PIPE_IDS = { chat: 'pipe-chat', order: 'pipe-order', location: 'pipe-location' };
+
+        let animationTimers = [];
+        let speed = 1;
+        let frameCount = 0;
+        let isPlaying = false;
+
+        function toHex(num, bytes) {
+            return num.toString(16).padStart(bytes * 2, '0');
+        }
+
+        function createFrameEl(frame, pipeId, leftPercent) {
+            const pipe = document.getElementById(pipeId);
+            const el = document.createElement('div');
+            el.className = `frame ${frame.type}`;
+            const shortPayload = frame.payload.length > 18
+                ? frame.payload.substring(0, 18) + '..'
+                : frame.payload;
+            el.textContent = `#${frame.id} ${shortPayload}`;
+            el.style.left = '-120px';
+            el.style.width = '110px';
+            el.style.transition = `left ${1.5 / speed}s linear`;
+            el.onclick = () => inspectFrame(frame);
+            pipe.appendChild(el);
+
+            // Animate across the pipe
+            requestAnimationFrame(() => {
+                el.style.left = `${pipe.offsetWidth + 10}px`;
+            });
+
+            // Remove after animation
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, (2000 / speed));
+
+            return el;
+        }
+
+        function inspectFrame(frame) {
+            const inspector = document.getElementById('inspector');
+            const payloadBytes = new TextEncoder().encode(frame.payload);
+            const payloadLen = payloadBytes.length;
+
+            const sidHex = toHex(frame.sid, 2);
+            const typeHex = toHex(TYPE_BYTE[frame.type], 1);
+            const lenHex = toHex(payloadLen, 2);
+            const payloadHex = Array.from(payloadBytes.slice(0, 20))
+                .map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+            inspector.innerHTML = `
+                <div style="margin-bottom: 8px; color: #58a6ff; font-weight: 600;">
+                    Frame #${frame.id} -- ${frame.type.toUpperCase()} Stream
+                </div>
+                <div class="hex-display ${frame.type}">
+                    <span class="field field-sid" title="stream_id (2 bytes)">${sidHex}</span>
+                    <span class="field field-type" title="type (1 byte)"> ${typeHex}</span>
+                    <span class="field field-len" title="length (2 bytes)"> ${lenHex}</span>
+                    <span class="field field-payload" title="payload"> ${payloadHex}...</span>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.75rem;">
+                    <div><span class="field-sid">stream_id</span> = ${frame.sid} (${frame.type})</div>
+                    <div><span class="field-type">type</span> = ${TYPE_BYTE[frame.type]} (${frame.type.toUpperCase()})</div>
+                    <div><span class="field-len">length</span> = ${payloadLen} bytes</div>
+                    <div style="margin-top: 4px;"><span class="field-payload">payload</span> = ${frame.payload}</div>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.7rem; color: #484f58;">
+                    Total frame size: ${5 + payloadLen} bytes (5-byte header + ${payloadLen}-byte payload)
+                </div>
+            `;
+        }
+
+        function startAnimation() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('btn-play').classList.add('active');
+            document.getElementById('btn-pause').classList.remove('active');
+
+            FRAMES.forEach((frame, i) => {
+                const timer = setTimeout(() => {
+                    // Add to individual stream pipe
+                    createFrameEl(frame, PIPE_IDS[frame.type], 0);
+
+                    // Add to mux pipe (slightly delayed to show the "merging")
+                    setTimeout(() => {
+                        createFrameEl(frame, 'pipe-mux', 0);
+                        frameCount++;
+                        document.getElementById('frame-counter').textContent = `${frameCount} frames`;
+                    }, 200 / speed);
+
+                }, frame.time / speed);
+                animationTimers.push(timer);
+            });
+
+            // Auto-restart after all frames
+            const restartTimer = setTimeout(() => {
+                isPlaying = false;
+                startAnimation();
+            }, (FRAMES[FRAMES.length - 1].time + 2500) / speed);
+            animationTimers.push(restartTimer);
+        }
+
+        function pauseAnimation() {
+            isPlaying = false;
+            animationTimers.forEach(t => clearTimeout(t));
+            animationTimers = [];
+            document.getElementById('btn-play').classList.remove('active');
+            document.getElementById('btn-pause').classList.add('active');
+        }
+
+        function resetAnimation() {
+            pauseAnimation();
+            frameCount = 0;
+            document.getElementById('frame-counter').textContent = '0 frames';
+            ['pipe-chat', 'pipe-order', 'pipe-location', 'pipe-mux'].forEach(id => {
+                const pipe = document.getElementById(id);
+                pipe.querySelectorAll('.frame').forEach(el => el.remove());
+            });
+            document.getElementById('inspector').innerHTML =
+                '<span class="hint">Click a frame to inspect its binary structure.</span>';
+        }
+
+        function setSpeed(s) {
+            speed = s;
+            document.querySelectorAll('.speed-label button').forEach(b => b.classList.remove('active'));
+            if (s === 1) document.getElementById('btn-speed-1').classList.add('active');
+            if (isPlaying) {
+                pauseAnimation();
+                startAnimation();
+            }
+        }
+
+        // Start on load
+        startAnimation();
+    </script>
+</body>
+</html>

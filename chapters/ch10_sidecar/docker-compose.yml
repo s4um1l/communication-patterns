@@ -1,0 +1,101 @@
+# Chapter 10 -- Sidecar Pattern: Docker Compose Deployment
+#
+# This docker-compose file shows how a service and its sidecar are deployed
+# together as a unit. In Kubernetes, they would be two containers in the same
+# pod. In Docker Compose, they share a network namespace.
+#
+# Architecture:
+#
+#   External traffic --> sidecar (port 8011) --> app_service (port 8010)
+#                        |                       |
+#                        +-- Auth check          +-- Pure business logic
+#                        +-- Rate limiting       +-- No middleware at all
+#                        +-- Request logging
+#                        +-- Forwarding
+#
+# The key insight: the app_service is NOT exposed externally. Only the
+# sidecar's port (8011) is published. All traffic MUST flow through the
+# sidecar. The service trusts localhost traffic implicitly.
+#
+# In Kubernetes, this is achieved by:
+#   - Both containers in the same pod (shared network namespace)
+#   - NetworkPolicy that only allows ingress through the sidecar port
+#   - The service listens on 127.0.0.1 (not 0.0.0.0) so only pod-local
+#     traffic can reach it
+#
+# To run (conceptual -- requires Docker):
+#   docker-compose -f chapters/ch10_sidecar/docker-compose.yml up
+
+version: "3.8"
+
+services:
+  # -----------------------------------------------------------------------
+  # The business service -- pure logic, no middleware
+  # -----------------------------------------------------------------------
+  app-service:
+    build:
+      context: ../..          # Repo root (for shared/ imports)
+      dockerfile: chapters/ch10_sidecar/Dockerfile.app
+    # NOT exposed externally -- only the sidecar can reach it
+    # In Kubernetes: listen on 127.0.0.1:8010 (pod-local only)
+    expose:
+      - "8010"
+    environment:
+      - SERVICE_NAME=order-service
+      - SERVICE_PORT=8010
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Resource limits -- the service gets most of the resources
+    # because it does the actual work
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+
+  # -----------------------------------------------------------------------
+  # The sidecar proxy -- handles cross-cutting concerns
+  # -----------------------------------------------------------------------
+  sidecar-proxy:
+    build:
+      context: ../..
+      dockerfile: chapters/ch10_sidecar/Dockerfile.sidecar
+    # This IS exposed externally -- it's the entry point
+    ports:
+      - "8011:8011"
+    environment:
+      - UPSTREAM_URL=http://app-service:8010   # Docker DNS resolves this
+      - SIDECAR_PORT=8011
+      - RATE_LIMIT_TOKENS=10
+      - RATE_LIMIT_REFILL_RATE=2.0
+    depends_on:
+      app-service:
+        condition: service_healthy
+    # Resource limits -- sidecar needs less than the service
+    # Envoy typically uses 50-100MB; our Python proxy uses ~30-50MB
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+# -----------------------------------------------------------------------
+# Network configuration
+# -----------------------------------------------------------------------
+# Both services share the default bridge network. In Kubernetes, they'd
+# share a pod network namespace (localhost communication).
+#
+# For a full service mesh setup, you'd have:
+#   - Each service + sidecar pair in its own compose file (or pod)
+#   - Sidecars communicate via mTLS over the shared network
+#   - A control plane (Istiod) managing sidecar configuration
+#
+#   order-service + sidecar  <--mTLS-->  kitchen-service + sidecar
+#   billing-service + sidecar <--mTLS--> driver-service + sidecar
+#   notification-service + sidecar
+#
+# All 5 sidecars are identical binaries with different routing configs
+# pushed from the control plane.
