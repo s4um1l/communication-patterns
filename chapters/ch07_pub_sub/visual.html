@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 07 -- Pub/Sub Visualization</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: #0a0a0f;
+    color: #c8c8d0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    text-align: center;
+    padding: 24px 0 8px;
+    font-size: 1.4rem;
+    color: #e0e0e8;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+  }
+
+  /* Layout: Publisher | Broker | Subscribers */
+  .arena {
+    display: grid;
+    grid-template-columns: 220px 280px 1fr;
+    gap: 20px;
+    padding: 0 24px 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 520px;
+  }
+
+  /* Publisher panel */
+  .publisher-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .panel-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .publisher-card {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .publisher-card h3 {
+    color: #7aa2f7;
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+
+  .pub-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #1a1a28;
+    color: #c8c8d0;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+
+  .pub-btn:hover { background: #222238; border-color: #7aa2f7; color: #fff; }
+  .pub-btn:active { transform: scale(0.97); }
+
+  .pub-btn.order-placed { border-left: 3px solid #9ece6a; }
+  .pub-btn.order-confirmed { border-left: 3px solid #7aa2f7; }
+  .pub-btn.order-cancelled { border-left: 3px solid #f7768e; }
+  .pub-btn.order-preparing { border-left: 3px solid #e0af68; }
+  .pub-btn.order-ready { border-left: 3px solid #bb9af7; }
+
+  .pub-timing {
+    font-size: 0.75rem;
+    color: #555;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .pub-timing .fast { color: #9ece6a; }
+
+  /* Broker panel */
+  .broker-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .broker-card {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 16px;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .broker-card h3 {
+    color: #e0af68;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+  }
+
+  .topic-list {
+    list-style: none;
+  }
+
+  .topic-item {
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    background: #1a1a28;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.3s;
+  }
+
+  .topic-item.active { background: #2a2a48; }
+
+  .topic-name { font-weight: 600; }
+  .topic-count {
+    background: #2a2a3a;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .broker-metrics {
+    margin-top: 12px;
+    font-size: 0.73rem;
+    color: #666;
+    line-height: 1.7;
+  }
+
+  .broker-metrics span { color: #aaa; }
+
+  /* Subscriber panel */
+  .subscriber-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .sub-card {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 14px;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .sub-card.receiving {
+    border-color: #9ece6a;
+    box-shadow: 0 0 12px rgba(158, 206, 106, 0.15);
+  }
+
+  .sub-card.processing {
+    border-color: #e0af68;
+    box-shadow: 0 0 12px rgba(224, 175, 104, 0.15);
+  }
+
+  .sub-card.error {
+    border-color: #f7768e;
+    box-shadow: 0 0 12px rgba(247, 118, 142, 0.15);
+  }
+
+  .sub-card.dead {
+    opacity: 0.35;
+    border-color: #333;
+  }
+
+  .sub-card h4 {
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sub-card h4 .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ece6a;
+    display: inline-block;
+  }
+
+  .sub-card.dead h4 .status-dot { background: #f7768e; }
+
+  .sub-topics {
+    font-size: 0.7rem;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  .sub-queue {
+    height: 6px;
+    background: #1a1a28;
+    border-radius: 3px;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+
+  .sub-queue-fill {
+    height: 100%;
+    background: #7aa2f7;
+    border-radius: 3px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+
+  .sub-queue-fill.warning { background: #e0af68; }
+  .sub-queue-fill.danger { background: #f7768e; }
+
+  .sub-stats {
+    font-size: 0.7rem;
+    color: #555;
+    line-height: 1.6;
+  }
+
+  .sub-stats .val { color: #aaa; }
+
+  .sub-log {
+    margin-top: 8px;
+    max-height: 80px;
+    overflow-y: auto;
+    font-size: 0.68rem;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  .sub-log .log-entry {
+    padding: 1px 0;
+    border-bottom: 1px solid #1a1a28;
+  }
+
+  .sub-log .log-entry.success { color: #9ece6a; }
+  .sub-log .log-entry.fail { color: #f7768e; }
+
+  .kill-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .kill-btn:hover { border-color: #f7768e; color: #f7768e; }
+
+  /* Event animation */
+  .event-particle {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 100;
+    transition: none;
+  }
+
+  .event-particle.order-placed { background: #9ece6a; box-shadow: 0 0 8px #9ece6a; }
+  .event-particle.order-confirmed { background: #7aa2f7; box-shadow: 0 0 8px #7aa2f7; }
+  .event-particle.order-cancelled { background: #f7768e; box-shadow: 0 0 8px #f7768e; }
+  .event-particle.order-preparing { background: #e0af68; box-shadow: 0 0 8px #e0af68; }
+  .event-particle.order-ready { background: #bb9af7; box-shadow: 0 0 8px #bb9af7; }
+
+  /* Controls bar */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 24px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn {
+    padding: 6px 16px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #1a1a28;
+    color: #c8c8d0;
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover { border-color: #7aa2f7; color: #fff; }
+  .ctrl-btn.danger:hover { border-color: #f7768e; color: #f7768e; }
+  .ctrl-btn.active { background: #2a2a48; border-color: #7aa2f7; }
+
+  /* Event log at bottom */
+  .event-log-panel {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px 24px;
+  }
+
+  .event-log {
+    background: #0d0d14;
+    border: 1px solid #1a1a2a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: #555;
+  }
+
+  .event-log .log-line { padding: 1px 0; }
+  .event-log .log-line .ts { color: #444; }
+  .event-log .log-line .topic { color: #e0af68; }
+  .event-log .log-line .arrow { color: #333; }
+  .event-log .log-line .sub-name { color: #7aa2f7; }
+  .event-log .log-line .result-ok { color: #9ece6a; }
+  .event-log .log-line .result-fail { color: #f7768e; }
+  .event-log .log-line .result-drop { color: #e0af68; }
+
+  /* Delivery guarantee selector */
+  .guarantee-bar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 24px 16px;
+  }
+
+  .guarantee-btn {
+    padding: 5px 14px;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    background: #12121a;
+    color: #666;
+    font-family: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .guarantee-btn:hover { color: #aaa; border-color: #444; }
+  .guarantee-btn.active { color: #e0af68; border-color: #e0af68; }
+
+  .guarantee-desc {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #555;
+    padding: 0 24px 16px;
+    min-height: 36px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Chapter 07 -- Pub/Sub</h1>
+<p class="subtitle">Publisher emits events to topics. Broker routes to subscribers. Nobody waits for anyone.</p>
+
+<div class="guarantee-bar">
+  <button class="guarantee-btn" data-g="amo" onclick="setGuarantee('amo')">At-Most-Once</button>
+  <button class="guarantee-btn active" data-g="alo" onclick="setGuarantee('alo')">At-Least-Once</button>
+  <button class="guarantee-btn" data-g="eo" onclick="setGuarantee('eo')">Exactly-Once</button>
+</div>
+<div class="guarantee-desc" id="guaranteeDesc">
+  At-Least-Once: broker retries until ACK. Messages may be delivered twice. Subscribers must be idempotent.
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" onclick="publishEvent('order.placed')">Publish order.placed</button>
+  <button class="ctrl-btn" onclick="publishEvent('order.confirmed')">Publish order.confirmed</button>
+  <button class="ctrl-btn" onclick="publishEvent('order.preparing')">Publish order.preparing</button>
+  <button class="ctrl-btn" onclick="publishEvent('order.ready')">Publish order.ready</button>
+  <button class="ctrl-btn" onclick="publishEvent('order.cancelled')">Publish order.cancelled</button>
+  <button class="ctrl-btn" onclick="burstPublish()" title="Publish 10 events rapidly">Burst (10x)</button>
+  <button class="ctrl-btn danger" onclick="resetAll()">Reset</button>
+</div>
+
+<div class="arena">
+  <!-- Publisher -->
+  <div class="publisher-panel">
+    <div class="panel-label">Publisher</div>
+    <div class="publisher-card" id="publisherCard">
+      <h3>Order Service</h3>
+      <p style="font-size:0.75rem;color:#666;margin-bottom:12px">
+        Creates orders and publishes events. Does NOT call subscribers directly.
+      </p>
+      <div class="pub-timing" id="pubTiming">
+        Last publish: <span class="fast">--</span><br>
+        Sequential would take: <span style="color:#f7768e">--</span><br>
+        Orders published: <span>0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Broker -->
+  <div class="broker-panel">
+    <div class="panel-label">Event Broker</div>
+    <div class="broker-card" id="brokerCard">
+      <h3>Topic Router</h3>
+      <ul class="topic-list" id="topicList">
+        <li class="topic-item" data-topic="order.placed">
+          <span class="topic-name" style="color:#9ece6a">order.placed</span>
+          <span class="topic-count" id="tc-order.placed">0</span>
+        </li>
+        <li class="topic-item" data-topic="order.confirmed">
+          <span class="topic-name" style="color:#7aa2f7">order.confirmed</span>
+          <span class="topic-count" id="tc-order.confirmed">0</span>
+        </li>
+        <li class="topic-item" data-topic="order.preparing">
+          <span class="topic-name" style="color:#e0af68">order.preparing</span>
+          <span class="topic-count" id="tc-order.preparing">0</span>
+        </li>
+        <li class="topic-item" data-topic="order.ready">
+          <span class="topic-name" style="color:#bb9af7">order.ready</span>
+          <span class="topic-count" id="tc-order.ready">0</span>
+        </li>
+        <li class="topic-item" data-topic="order.cancelled">
+          <span class="topic-name" style="color:#f7768e">order.cancelled</span>
+          <span class="topic-count" id="tc-order.cancelled">0</span>
+        </li>
+      </ul>
+      <div class="broker-metrics" id="brokerMetrics">
+        Published: <span id="bmPublished">0</span><br>
+        Delivered: <span id="bmDelivered">0</span><br>
+        Failed: <span id="bmFailed">0</span><br>
+        Dropped: <span id="bmDropped">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subscribers -->
+  <div class="subscriber-panel">
+    <div class="panel-label">Subscribers (click "kill" to simulate failure)</div>
+    <div class="sub-grid" id="subGrid"></div>
+  </div>
+</div>
+
+<div class="event-log-panel">
+  <div class="panel-label" style="font-size:0.7rem;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Event Log</div>
+  <div class="event-log" id="eventLog"></div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+let orderCounter = 0;
+let guarantee = 'alo'; // at-least-once
+const topicCounts = {};
+const metrics = { published: 0, delivered: 0, failed: 0, dropped: 0 };
+
+const GUARANTEE_DESC = {
+  amo: 'At-Most-Once: fire and forget. Fast but messages can be lost. Like UDP.',
+  alo: 'At-Least-Once: broker retries until ACK. Messages may be delivered twice. Subscribers must be idempotent.',
+  eo: 'Exactly-Once: distributed transactions required. Extremely expensive. Rarely worth it.',
+};
+
+// Subscriber definitions
+const SUBSCRIBERS = [
+  {
+    id: 'kitchen',
+    name: 'Kitchen',
+    icon: '',
+    topics: ['order.placed'],
+    color: '#9ece6a',
+    processingMs: 200,
+    description: 'Displays order on kitchen board',
+  },
+  {
+    id: 'billing',
+    name: 'Billing',
+    icon: '',
+    topics: ['order.placed'],
+    color: '#f7768e',
+    processingMs: 500,
+    description: 'Fraud check + charge payment (SLOW)',
+  },
+  {
+    id: 'driver',
+    name: 'Driver Matching',
+    icon: '',
+    topics: ['order.confirmed', 'order.cancelled'],
+    color: '#7aa2f7',
+    processingMs: 300,
+    description: 'Find nearest available driver',
+  },
+  {
+    id: 'analytics',
+    name: 'Analytics',
+    icon: '',
+    topics: ['order.*'],
+    color: '#bb9af7',
+    processingMs: 50,
+    description: 'Records ALL order events (wildcard)',
+  },
+  {
+    id: 'notifications',
+    name: 'Notifications',
+    icon: '',
+    topics: ['order.*'],
+    color: '#e0af68',
+    processingMs: 80,
+    description: 'Push notifications to customer',
+  },
+];
+
+// Runtime subscriber state
+const subState = {};
+SUBSCRIBERS.forEach(s => {
+  subState[s.id] = {
+    alive: true,
+    queueDepth: 0,
+    processed: 0,
+    failed: 0,
+    logs: [],
+    processing: false,
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Initialization
+// ---------------------------------------------------------------------------
+
+function init() {
+  renderSubscribers();
+  updateMetricsUI();
+}
+
+function renderSubscribers() {
+  const grid = document.getElementById('subGrid');
+  grid.innerHTML = '';
+  SUBSCRIBERS.forEach(sub => {
+    const state = subState[sub.id];
+    const card = document.createElement('div');
+    card.className = 'sub-card' + (state.alive ? '' : ' dead');
+    card.id = `sub-${sub.id}`;
+    card.innerHTML = `
+      <button class="kill-btn" onclick="toggleSubscriber('${sub.id}')">${state.alive ? 'kill' : 'revive'}</button>
+      <h4>
+        <span>${sub.name}</span>
+        <span class="status-dot"></span>
+      </h4>
+      <div class="sub-topics">Topics: ${sub.topics.join(', ')}</div>
+      <div class="sub-queue"><div class="sub-queue-fill" id="qf-${sub.id}"></div></div>
+      <div class="sub-stats">
+        Processed: <span class="val" id="sp-${sub.id}">${state.processed}</span> |
+        Failed: <span class="val" id="sf-${sub.id}">${state.failed}</span> |
+        Queue: <span class="val" id="sq-${sub.id}">${state.queueDepth}</span><br>
+        Processing: <span class="val">${sub.processingMs}ms</span> |
+        <span style="font-size:0.65rem;color:#444">${sub.description}</span>
+      </div>
+      <div class="sub-log" id="sl-${sub.id}"></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Topic matching
+// ---------------------------------------------------------------------------
+
+function topicMatches(pattern, topic) {
+  if (pattern === topic) return true;
+  if (pattern.endsWith('.*')) {
+    const prefix = pattern.slice(0, -2);
+    return topic.startsWith(prefix + '.');
+  }
+  if (pattern === '*') return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Publish
+// ---------------------------------------------------------------------------
+
+function publishEvent(topic) {
+  orderCounter++;
+  const orderId = 'ord_' + String(orderCounter).padStart(3, '0');
+  const publishStart = performance.now();
+
+  // Update topic count
+  topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+  const tcEl = document.getElementById(`tc-${topic}`);
+  if (tcEl) tcEl.textContent = topicCounts[topic];
+
+  // Flash the topic item
+  const topicItem = document.querySelector(`.topic-item[data-topic="${topic}"]`);
+  if (topicItem) {
+    topicItem.classList.add('active');
+    setTimeout(() => topicItem.classList.remove('active'), 400);
+  }
+
+  metrics.published++;
+
+  // Route to matching subscribers
+  const matchedSubs = [];
+  SUBSCRIBERS.forEach(sub => {
+    const matches = sub.topics.some(p => topicMatches(p, topic));
+    if (matches) matchedSubs.push(sub);
+  });
+
+  const publishEnd = performance.now();
+  const publishMs = (publishEnd - publishStart).toFixed(1);
+
+  // Animate: publisher -> broker
+  animateParticle('publisherCard', 'brokerCard', topic, () => {
+    // Then animate: broker -> each matched subscriber
+    matchedSubs.forEach((sub, i) => {
+      setTimeout(() => {
+        deliverToSubscriber(sub, topic, orderId);
+        animateParticle('brokerCard', `sub-${sub.id}`, topic);
+      }, i * 80);
+    });
+  });
+
+  // Update publisher timing
+  const seqTime = SUBSCRIBERS.reduce((sum, s) => sum + s.processingMs, 0);
+  document.getElementById('pubTiming').innerHTML =
+    `Last publish: <span class="fast">${publishMs}ms</span><br>` +
+    `Sequential would take: <span style="color:#f7768e">${seqTime}ms</span><br>` +
+    `Orders published: <span>${metrics.published}</span>`;
+
+  logEvent(topic, orderId, matchedSubs.map(s => s.name));
+  updateMetricsUI();
+}
+
+function deliverToSubscriber(sub, topic, orderId) {
+  const state = subState[sub.id];
+  const card = document.getElementById(`sub-${sub.id}`);
+
+  if (!state.alive) {
+    // Subscriber is dead
+    if (guarantee === 'amo') {
+      // At-most-once: message is lost
+      metrics.dropped++;
+      addSubLog(sub.id, `LOST: ${topic} (${orderId}) -- subscriber dead, no retry`, 'fail');
+      logEventResult(topic, orderId, sub.name, 'lost');
+    } else {
+      // At-least-once / exactly-once: message queues up
+      state.queueDepth++;
+      metrics.dropped++;
+      addSubLog(sub.id, `QUEUED: ${topic} (${orderId}) -- waiting for revival`, 'fail');
+      logEventResult(topic, orderId, sub.name, 'queued');
+    }
+    updateSubUI(sub.id);
+    updateMetricsUI();
+    return;
+  }
+
+  // Subscriber is alive -- process after simulated delay
+  state.queueDepth++;
+  updateSubUI(sub.id);
+
+  card.classList.add('receiving');
+  setTimeout(() => card.classList.remove('receiving'), 200);
+
+  // Simulate processing time
+  card.classList.add('processing');
+  setTimeout(() => {
+    card.classList.remove('processing');
+    state.queueDepth = Math.max(0, state.queueDepth - 1);
+
+    // Random failure (5% chance) to demonstrate error isolation
+    if (Math.random() < 0.05) {
+      state.failed++;
+      metrics.failed++;
+      card.classList.add('error');
+      setTimeout(() => card.classList.remove('error'), 500);
+      addSubLog(sub.id, `FAILED: ${topic} (${orderId}) -- transient error`, 'fail');
+      logEventResult(topic, orderId, sub.name, 'failed');
+
+      // At-least-once: retry once
+      if (guarantee !== 'amo') {
+        setTimeout(() => {
+          state.processed++;
+          metrics.delivered++;
+          addSubLog(sub.id, `RETRY OK: ${topic} (${orderId})`, 'success');
+          logEventResult(topic, orderId, sub.name, 'retried-ok');
+          updateSubUI(sub.id);
+          updateMetricsUI();
+        }, sub.processingMs);
+      }
+    } else {
+      state.processed++;
+      metrics.delivered++;
+      addSubLog(sub.id, `OK: ${topic} (${orderId}) [${sub.processingMs}ms]`, 'success');
+      logEventResult(topic, orderId, sub.name, 'delivered');
+    }
+
+    updateSubUI(sub.id);
+    updateMetricsUI();
+  }, sub.processingMs);
+}
+
+// ---------------------------------------------------------------------------
+// Burst mode
+// ---------------------------------------------------------------------------
+
+function burstPublish() {
+  const topics = ['order.placed', 'order.confirmed', 'order.placed', 'order.preparing',
+                  'order.placed', 'order.ready', 'order.confirmed', 'order.placed',
+                  'order.cancelled', 'order.placed'];
+  topics.forEach((t, i) => setTimeout(() => publishEvent(t), i * 120));
+}
+
+// ---------------------------------------------------------------------------
+// Kill / revive subscribers
+// ---------------------------------------------------------------------------
+
+function toggleSubscriber(id) {
+  const state = subState[id];
+  state.alive = !state.alive;
+
+  if (state.alive) {
+    addSubLog(id, 'REVIVED -- processing queued messages', 'success');
+    // Process queued messages
+    const queued = state.queueDepth;
+    const sub = SUBSCRIBERS.find(s => s.id === id);
+    if (queued > 0 && sub) {
+      let processed = 0;
+      const drainInterval = setInterval(() => {
+        if (processed >= queued || !subState[id].alive) {
+          clearInterval(drainInterval);
+          return;
+        }
+        state.queueDepth = Math.max(0, state.queueDepth - 1);
+        state.processed++;
+        metrics.delivered++;
+        processed++;
+        addSubLog(id, `DRAINED queued message (${queued - processed} left)`, 'success');
+        updateSubUI(id);
+        updateMetricsUI();
+      }, sub.processingMs / 2);
+    }
+  } else {
+    addSubLog(id, 'KILLED -- subscriber is down', 'fail');
+  }
+
+  renderSubscribers();
+  updateMetricsUI();
+}
+
+// ---------------------------------------------------------------------------
+// Animation
+// ---------------------------------------------------------------------------
+
+function animateParticle(fromId, toId, topic, onArrive) {
+  const from = document.getElementById(fromId);
+  const to = document.getElementById(toId);
+  if (!from || !to) { if (onArrive) onArrive(); return; }
+
+  const fromRect = from.getBoundingClientRect();
+  const toRect = to.getBoundingClientRect();
+
+  const particle = document.createElement('div');
+  const topicClass = topic.replace('.', '-');
+  particle.className = `event-particle ${topicClass}`;
+
+  const startX = fromRect.right;
+  const startY = fromRect.top + fromRect.height / 2;
+  const endX = toRect.left;
+  const endY = toRect.top + toRect.height / 2;
+
+  particle.style.left = startX + 'px';
+  particle.style.top = startY + 'px';
+
+  document.body.appendChild(particle);
+
+  const duration = 300;
+  const start = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    particle.style.left = (startX + (endX - startX) * ease) + 'px';
+    particle.style.top = (startY + (endY - startY) * ease) + 'px';
+    particle.style.opacity = t > 0.8 ? 1 - (t - 0.8) * 5 : 1;
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      particle.remove();
+      if (onArrive) onArrive();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+// ---------------------------------------------------------------------------
+// UI updates
+// ---------------------------------------------------------------------------
+
+function updateSubUI(id) {
+  const state = subState[id];
+  const sub = SUBSCRIBERS.find(s => s.id === id);
+  if (!sub) return;
+
+  const sp = document.getElementById(`sp-${id}`);
+  const sf = document.getElementById(`sf-${id}`);
+  const sq = document.getElementById(`sq-${id}`);
+  const qf = document.getElementById(`qf-${id}`);
+
+  if (sp) sp.textContent = state.processed;
+  if (sf) sf.textContent = state.failed;
+  if (sq) sq.textContent = state.queueDepth;
+
+  if (qf) {
+    const pct = Math.min(state.queueDepth * 10, 100);
+    qf.style.width = pct + '%';
+    qf.className = 'sub-queue-fill' +
+      (pct > 70 ? ' danger' : pct > 40 ? ' warning' : '');
+  }
+}
+
+function addSubLog(id, msg, cls) {
+  const state = subState[id];
+  state.logs.unshift({ msg, cls });
+  if (state.logs.length > 20) state.logs.length = 20;
+
+  const el = document.getElementById(`sl-${id}`);
+  if (!el) return;
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${cls}`;
+  entry.textContent = msg;
+  el.prepend(entry);
+  if (el.children.length > 20) el.lastChild.remove();
+}
+
+function updateMetricsUI() {
+  document.getElementById('bmPublished').textContent = metrics.published;
+  document.getElementById('bmDelivered').textContent = metrics.delivered;
+  document.getElementById('bmFailed').textContent = metrics.failed;
+  document.getElementById('bmDropped').textContent = metrics.dropped;
+}
+
+function logEvent(topic, orderId, subNames) {
+  const log = document.getElementById('eventLog');
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 1 });
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML =
+    `<span class="ts">${ts}</span> ` +
+    `<span class="topic">${topic}</span> ` +
+    `<span class="arrow">-></span> ` +
+    `<span class="sub-name">[${subNames.join(', ')}]</span> ` +
+    `<span style="color:#444">${orderId}</span>`;
+  log.prepend(line);
+  if (log.children.length > 100) log.lastChild.remove();
+}
+
+function logEventResult(topic, orderId, subName, result) {
+  const log = document.getElementById('eventLog');
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 1 });
+  const cls = result === 'delivered' || result === 'retried-ok' ? 'result-ok' :
+              result === 'queued' ? 'result-drop' : 'result-fail';
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML =
+    `<span class="ts">${ts}</span> ` +
+    `<span class="arrow">  </span> ` +
+    `<span class="sub-name">${subName}</span> ` +
+    `<span class="${cls}">${result}</span> ` +
+    `<span style="color:#444">${orderId}</span>`;
+  log.prepend(line);
+  if (log.children.length > 100) log.lastChild.remove();
+}
+
+// ---------------------------------------------------------------------------
+// Delivery guarantee mode
+// ---------------------------------------------------------------------------
+
+function setGuarantee(g) {
+  guarantee = g;
+  document.querySelectorAll('.guarantee-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.g === g);
+  });
+  document.getElementById('guaranteeDesc').textContent = GUARANTEE_DESC[g];
+}
+
+// ---------------------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------------------
+
+function resetAll() {
+  orderCounter = 0;
+  Object.keys(topicCounts).forEach(k => topicCounts[k] = 0);
+  metrics.published = 0;
+  metrics.delivered = 0;
+  metrics.failed = 0;
+  metrics.dropped = 0;
+
+  SUBSCRIBERS.forEach(s => {
+    subState[s.id] = { alive: true, queueDepth: 0, processed: 0, failed: 0, logs: [], processing: false };
+  });
+
+  document.querySelectorAll('.topic-count').forEach(el => el.textContent = '0');
+  document.getElementById('eventLog').innerHTML = '';
+  document.getElementById('pubTiming').innerHTML =
+    'Last publish: <span class="fast">--</span><br>' +
+    'Sequential would take: <span style="color:#f7768e">--</span><br>' +
+    'Orders published: <span>0</span>';
+
+  renderSubscribers();
+  updateMetricsUI();
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+
+init();
+</script>
+</body>
+</html>

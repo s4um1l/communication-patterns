@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch06 — Push Notifications Visual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --orange-glow: rgba(251, 146, 60, 0.2);
+    --red: #f87171;
+    --red-glow: rgba(248, 113, 113, 0.2);
+    --purple: #a78bfa;
+    --purple-glow: rgba(167, 139, 250, 0.3);
+    --cyan: #22d3ee;
+    --cyan-glow: rgba(34, 211, 238, 0.2);
+    --yellow: #facc15;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  /* Controls */
+  .controls {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 1.5rem; flex-wrap: wrap; justify-content: center;
+  }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.5rem 1.1rem; border-radius: 6px; font-size: 0.85rem;
+    font-weight: 500; cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.green { background: #22c55e; }
+  .btn.green:hover { background: #16a34a; }
+  .btn.orange { background: var(--orange); }
+  .btn.orange:hover { background: #ea8533; }
+  .btn.danger { background: var(--red); }
+  .btn.danger:hover { background: #e85d5d; }
+  .btn.purple { background: var(--purple); }
+  .btn.purple:hover { background: #9474ea; }
+
+  .toggle-group {
+    display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .toggle-btn {
+    background: var(--surface); color: var(--text-dim); border: none;
+    padding: 0.5rem 1rem; font-size: 0.8rem; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border-right: 1px solid var(--border);
+  }
+  .toggle-btn:last-child { border-right: none; }
+  .toggle-btn.active { background: var(--accent); color: #fff; }
+
+  /* Main layout */
+  .main-area {
+    width: 960px; max-width: 98vw;
+    display: flex; flex-direction: column; gap: 1.5rem;
+  }
+
+  /* Push flow diagram */
+  .diagram {
+    position: relative; height: 220px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+
+  .node {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 130px; text-align: center;
+  }
+  .node-icon {
+    width: 60px; height: 60px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; margin: 0 auto 0.4rem;
+    border: 2px solid var(--border); background: var(--surface2);
+    transition: border-color 0.4s, box-shadow 0.4s;
+  }
+  .node-label { font-weight: 600; font-size: 0.82rem; }
+  .node-sublabel { color: var(--text-dim); font-size: 0.68rem; margin-top: 2px; }
+
+  .server-node { left: 30px; }
+  .push-service-node { left: 50%; transform: translate(-50%, -50%); }
+  .device-node { right: 30px; }
+
+  .server-node .node-icon.active { border-color: var(--purple); box-shadow: 0 0 16px var(--purple-glow); }
+  .push-service-node .node-icon.active { border-color: var(--cyan); box-shadow: 0 0 16px var(--cyan-glow); }
+  .device-node .node-icon.active { border-color: var(--green); box-shadow: 0 0 16px var(--green-glow); }
+
+  .conn-line {
+    position: absolute; top: 50%; height: 2px;
+    background: var(--border); transform: translateY(-50%);
+    transition: background 0.5s, box-shadow 0.5s;
+  }
+  .conn-left { left: 165px; right: calc(50% + 60px); }
+  .conn-right { left: calc(50% + 60px); right: 165px; }
+  .conn-line.active { background: var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
+  .conn-line.dead { background: var(--red); opacity: 0.3; }
+
+  /* Device status label */
+  .device-status {
+    position: absolute; top: 12px; right: 20px;
+    font-size: 0.7rem; font-family: var(--font-mono); color: var(--text-dim);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .device-status .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .device-status .dot.green { background: var(--green); }
+  .device-status .dot.red { background: var(--red); }
+  .device-status .dot.yellow { background: var(--yellow); }
+
+  /* Diagram status */
+  .diagram-status {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-dim);
+  }
+
+  /* Flying messages */
+  .flying-msg {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    padding: 0.25rem 0.5rem; border-radius: 5px;
+    font-family: var(--font-mono); font-size: 0.6rem;
+    white-space: nowrap; opacity: 0; pointer-events: none; z-index: 10;
+    transition: left 0.7s ease-in-out, opacity 0.2s;
+  }
+  .flying-msg.encrypted {
+    background: rgba(167, 139, 250, 0.15); border: 1px solid var(--purple); color: var(--purple);
+  }
+  .flying-msg.push {
+    background: rgba(34, 211, 238, 0.15); border: 1px solid var(--cyan); color: var(--cyan);
+  }
+  .flying-msg.notification {
+    background: rgba(74, 222, 128, 0.15); border: 1px solid var(--green); color: var(--green);
+  }
+  .flying-msg.held {
+    background: rgba(250, 204, 21, 0.15); border: 1px solid var(--yellow); color: var(--yellow);
+  }
+
+  /* Notification popup */
+  .notification-popup {
+    position: absolute; top: 10px; right: 10px;
+    background: var(--surface2); border: 1px solid var(--green);
+    border-radius: 10px; padding: 0.6rem 0.8rem; max-width: 200px;
+    box-shadow: 0 4px 20px rgba(74, 222, 128, 0.2);
+    opacity: 0; transform: translateY(-10px) scale(0.95);
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 20; pointer-events: none;
+  }
+  .notification-popup.visible {
+    opacity: 1; transform: translateY(0) scale(1);
+  }
+  .notification-popup .notif-app {
+    font-size: 0.6rem; color: var(--cyan); font-weight: 600; margin-bottom: 2px;
+  }
+  .notification-popup .notif-title {
+    font-size: 0.75rem; font-weight: 600; color: var(--text);
+  }
+  .notification-popup .notif-body {
+    font-size: 0.68rem; color: var(--text-dim); margin-top: 2px;
+  }
+
+  /* Held message indicator */
+  .held-indicator {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, 30px);
+    font-size: 0.65rem; color: var(--yellow); font-family: var(--font-mono);
+    opacity: 0; transition: opacity 0.3s;
+    text-align: center;
+  }
+  .held-indicator.visible { opacity: 1; }
+
+  /* Event log */
+  .log-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+    max-height: 280px; overflow-y: auto;
+  }
+  .log-panel::-webkit-scrollbar { width: 4px; }
+  .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-panel h3 {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .log-entry {
+    font-family: var(--font-mono); font-size: 0.72rem;
+    line-height: 1.6; padding: 0.2rem 0;
+    border-bottom: 1px solid rgba(46, 51, 71, 0.5);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  .log-entry .log-time { color: var(--text-dim); }
+  .log-entry .log-label { font-weight: 600; }
+  .log-entry .log-label.server { color: var(--purple); }
+  .log-entry .log-label.push-service { color: var(--cyan); }
+  .log-entry .log-label.device { color: var(--green); }
+  .log-entry .log-label.error { color: var(--red); }
+  .log-entry .log-label.info { color: var(--orange); }
+
+  /* Comparison section */
+  .comparison {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+  }
+  .comparison h3 {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .comparison-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  }
+
+  .comp-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.75rem;
+  }
+  .comp-card h4 {
+    font-size: 0.8rem; margin-bottom: 0.5rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .comp-card .comp-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .comp-ws .comp-dot { background: var(--accent); }
+  .comp-push .comp-dot { background: var(--green); }
+
+  .comp-item {
+    font-size: 0.72rem; color: var(--text-dim); line-height: 1.8;
+    display: flex; justify-content: space-between;
+  }
+  .comp-item .val { color: var(--text); font-family: var(--font-mono); }
+  .comp-item .val.good { color: var(--green); }
+  .comp-item .val.bad { color: var(--red); }
+  .comp-item .val.neutral { color: var(--orange); }
+
+  /* Encryption detail panel */
+  .encryption-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+    display: none;
+  }
+  .encryption-panel.visible { display: block; }
+  .encryption-panel h3 {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .enc-step {
+    font-family: var(--font-mono); font-size: 0.72rem;
+    line-height: 1.7; padding: 0.25rem 0.5rem;
+    border-left: 2px solid var(--border);
+    margin-bottom: 0.3rem; transition: border-color 0.3s, background 0.3s;
+  }
+  .enc-step.active {
+    border-left-color: var(--purple);
+    background: rgba(167, 139, 250, 0.05);
+  }
+  .enc-step.done {
+    border-left-color: var(--green);
+  }
+  .enc-step .step-label { color: var(--purple); font-weight: 600; }
+  .enc-step .step-detail { color: var(--text-dim); }
+
+  /* Insight */
+  .insight {
+    background: var(--surface); border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0; padding: 0.8rem 1rem;
+    font-size: 0.82rem; line-height: 1.6; color: var(--text-dim);
+  }
+  .insight strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Chapter 06 — Push Notifications</h1>
+<p class="subtitle">Reaching users who have no active connection to our server</p>
+
+<div class="main-area">
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn green" id="subscribeBtn">1. Subscribe</button>
+  <button class="btn purple" id="sendPushBtn" disabled>2. Send Push</button>
+  <button class="btn orange" id="offlinePushBtn" disabled>3. Offline Push</button>
+  <button class="btn" id="compareBtn" disabled>4. Compare WS vs Push</button>
+  <div class="toggle-group">
+    <button class="toggle-btn active" id="appOpenBtn">App Open</button>
+    <button class="toggle-btn" id="appClosedBtn">App Closed</button>
+  </div>
+  <button class="btn danger" id="resetBtn">Reset</button>
+</div>
+
+<!-- Push flow diagram -->
+<div class="diagram" id="diagram">
+  <div class="diagram-status" id="diagramStatus">Push notification flow</div>
+
+  <div class="device-status" id="deviceStatus">
+    <span class="dot green" id="deviceDot"></span>
+    <span id="deviceStatusText">App open</span>
+  </div>
+
+  <div class="node server-node">
+    <div class="node-icon" id="serverIcon">&#9881;&#65039;</div>
+    <div class="node-label">FoodDash Server</div>
+    <div class="node-sublabel">Encrypts + sends</div>
+  </div>
+
+  <div class="conn-line conn-left" id="connLeft"></div>
+
+  <div class="node push-service-node">
+    <div class="node-icon" id="pushIcon">&#9729;&#65039;</div>
+    <div class="node-label">Push Service</div>
+    <div class="node-sublabel">FCM / APNs / Mozilla</div>
+  </div>
+
+  <div class="conn-line conn-right" id="connRight"></div>
+
+  <div class="node device-node">
+    <div class="node-icon" id="deviceIcon">&#128241;</div>
+    <div class="node-label">Customer Device</div>
+    <div class="node-sublabel" id="deviceSublabel">Browser + Service Worker</div>
+  </div>
+
+  <div class="held-indicator" id="heldIndicator">Message held by push service<br/>Waiting for device to come online...</div>
+
+  <div class="notification-popup" id="notifPopup">
+    <div class="notif-app">FOODDASH</div>
+    <div class="notif-title" id="notifTitle">Your food is arriving!</div>
+    <div class="notif-body" id="notifBody">Driver Bob is at your door.</div>
+  </div>
+</div>
+
+<!-- Encryption detail panel -->
+<div class="encryption-panel" id="encryptionPanel">
+  <h3>Payload Encryption (End-to-End)</h3>
+  <div id="encryptionSteps">
+    <div class="enc-step" id="enc1">
+      <span class="step-label">1. Key Generation</span><br/>
+      <span class="step-detail">Generate ephemeral ECDH key pair (P-256 curve)</span>
+    </div>
+    <div class="enc-step" id="enc2">
+      <span class="step-label">2. Key Agreement</span><br/>
+      <span class="step-detail">ECDH(ephemeral_private, subscription.p256dh) &rarr; shared_secret</span>
+    </div>
+    <div class="enc-step" id="enc3">
+      <span class="step-label">3. Key Derivation</span><br/>
+      <span class="step-detail">HKDF-SHA256(shared_secret, auth) &rarr; content_encryption_key + nonce</span>
+    </div>
+    <div class="enc-step" id="enc4">
+      <span class="step-label">4. Encryption</span><br/>
+      <span class="step-detail">AES-128-GCM(key, nonce, "Your food is arriving!") &rarr; ciphertext</span>
+    </div>
+    <div class="enc-step" id="enc5">
+      <span class="step-label">5. HTTP POST</span><br/>
+      <span class="step-detail">POST endpoint (ciphertext + ephemeral public key + VAPID JWT)</span>
+    </div>
+  </div>
+</div>
+
+<!-- Event log -->
+<div class="log-panel">
+  <h3>Event Log</h3>
+  <div id="logEntries">
+    <div class="log-entry">
+      <span class="log-time">--:--:--</span>
+      <span class="log-label info">INFO</span>
+      Click "Subscribe" to begin the push notification flow
+    </div>
+  </div>
+</div>
+
+<!-- Comparison: WebSocket vs Push -->
+<div class="comparison">
+  <h3>WebSocket (Ch05) vs Push Notification (Ch06)</h3>
+  <div class="comparison-grid">
+    <div class="comp-card comp-ws">
+      <h4><span class="comp-dot"></span> WebSocket</h4>
+      <div class="comp-item">Requires connection <span class="val bad">Yes (persistent TCP)</span></div>
+      <div class="comp-item">Delivery when offline <span class="val bad">No</span></div>
+      <div class="comp-item">Latency <span class="val good">&lt;1ms (after connect)</span></div>
+      <div class="comp-item">Direction <span class="val good">Bidirectional</span></div>
+      <div class="comp-item">Server memory <span class="val bad">~30KB/connection</span></div>
+      <div class="comp-item">Payload limit <span class="val good">Unlimited</span></div>
+      <div class="comp-item">Best for <span class="val neutral">Chat, real-time</span></div>
+    </div>
+    <div class="comp-card comp-push">
+      <h4><span class="comp-dot"></span> Push Notification</h4>
+      <div class="comp-item">Requires connection <span class="val good">No (subscribe once)</span></div>
+      <div class="comp-item">Delivery when offline <span class="val good">Yes (TTL-bounded)</span></div>
+      <div class="comp-item">Latency <span class="val neutral">1-10+ seconds</span></div>
+      <div class="comp-item">Direction <span class="val bad">Server &rarr; device only</span></div>
+      <div class="comp-item">Server memory <span class="val good">~200B/subscription</span></div>
+      <div class="comp-item">Payload limit <span class="val bad">4 KB</span></div>
+      <div class="comp-item">Best for <span class="val neutral">Alerts, offline reach</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Insight -->
+<div class="insight">
+  <strong>Key insight:</strong> Push notifications are the first pattern where the server can reach the
+  client without ANY active connection. The trade-off is control: you delegate delivery to a third-party
+  push service (Apple, Google, Mozilla), accept variable latency (1-10+ seconds), and encrypt every
+  payload (because the push service is an untrusted relay). The server stores just ~200 bytes per
+  subscription instead of maintaining a ~30KB WebSocket connection. For FoodDash, push handles
+  "your driver is at the door" while WebSocket handles real-time chat. Both patterns coexist.
+</div>
+
+</div><!-- /main-area -->
+
+<script>
+(function() {
+  // --- Elements ---
+  const subscribeBtn = document.getElementById('subscribeBtn');
+  const sendPushBtn = document.getElementById('sendPushBtn');
+  const offlinePushBtn = document.getElementById('offlinePushBtn');
+  const compareBtn = document.getElementById('compareBtn');
+  const appOpenBtn = document.getElementById('appOpenBtn');
+  const appClosedBtn = document.getElementById('appClosedBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const diagram = document.getElementById('diagram');
+  const diagramStatus = document.getElementById('diagramStatus');
+  const deviceDot = document.getElementById('deviceDot');
+  const deviceStatusText = document.getElementById('deviceStatusText');
+  const deviceSublabel = document.getElementById('deviceSublabel');
+  const serverIcon = document.getElementById('serverIcon');
+  const pushIcon = document.getElementById('pushIcon');
+  const deviceIcon = document.getElementById('deviceIcon');
+  const connLeft = document.getElementById('connLeft');
+  const connRight = document.getElementById('connRight');
+  const heldIndicator = document.getElementById('heldIndicator');
+  const notifPopup = document.getElementById('notifPopup');
+  const notifTitle = document.getElementById('notifTitle');
+  const notifBody = document.getElementById('notifBody');
+  const encryptionPanel = document.getElementById('encryptionPanel');
+  const logEntries = document.getElementById('logEntries');
+
+  let appOpen = true;
+  let subscribed = false;
+  let animating = false;
+  let heldMessage = null;
+  let pushCount = 0;
+
+  const notifications = [
+    { title: 'Order Confirmed!', body: 'Your order from Burger Palace has been placed.' },
+    { title: 'Food Ready!', body: 'Burger Palace has your order ready for pickup.' },
+    { title: 'Driver Has Your Food', body: 'Driver Alice picked up your order.' },
+    { title: 'On the Way!', body: 'Driver Alice is heading to you now.' },
+    { title: 'Delivered!', body: 'Your food has arrived. Enjoy your meal!' },
+    { title: "I'm Downstairs!", body: 'Driver Alice: I\'m at your building entrance.' },
+  ];
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function now() {
+    return new Date().toLocaleTimeString('en-US', { hour12: false });
+  }
+
+  function addLog(label, labelClass, message) {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${now()}</span> <span class="log-label ${labelClass}">${label}</span> ${message}`;
+    logEntries.prepend(entry);
+  }
+
+  function setEncStep(stepId, state) {
+    const el = document.getElementById(stepId);
+    el.classList.remove('active', 'done');
+    if (state) el.classList.add(state);
+  }
+
+  function resetEncSteps() {
+    for (let i = 1; i <= 5; i++) setEncStep('enc' + i, null);
+  }
+
+  function showNotification(title, body) {
+    notifTitle.textContent = title;
+    notifBody.textContent = body;
+    notifPopup.classList.add('visible');
+    setTimeout(() => notifPopup.classList.remove('visible'), 4000);
+  }
+
+  function setDeviceState(open) {
+    appOpen = open;
+    if (open) {
+      deviceDot.className = 'dot green';
+      deviceStatusText.textContent = 'App open';
+      deviceSublabel.textContent = 'Browser + Service Worker';
+      appOpenBtn.classList.add('active');
+      appClosedBtn.classList.remove('active');
+      connRight.classList.remove('dead');
+      // If there's a held message, deliver it now
+      if (heldMessage) {
+        deliverHeldMessage();
+      }
+    } else {
+      deviceDot.className = 'dot red';
+      deviceStatusText.textContent = 'App closed';
+      deviceSublabel.textContent = 'Service Worker (background)';
+      appClosedBtn.classList.add('active');
+      appOpenBtn.classList.remove('active');
+    }
+  }
+
+  async function deliverHeldMessage() {
+    if (!heldMessage || animating) return;
+    const msg = heldMessage;
+    heldMessage = null;
+    animating = true;
+
+    addLog('PUSH SERVICE', 'push-service', 'Device is back online! Delivering held message...');
+    heldIndicator.classList.remove('visible');
+
+    // Animate push service -> device
+    pushIcon.classList.add('active');
+    connRight.classList.add('active');
+    await flyMessage('push-service', 'device', 'Delivering...', 'notification');
+    connRight.classList.remove('active');
+    pushIcon.classList.remove('active');
+
+    // Show notification
+    deviceIcon.classList.add('active');
+    addLog('DEVICE', 'device', `Service Worker received: "${msg.title}"`);
+    addLog('DEVICE', 'device', 'Showing notification on lock screen');
+    showNotification(msg.title, msg.body);
+    await sleep(500);
+    deviceIcon.classList.remove('active');
+
+    animating = false;
+  }
+
+  async function flyMessage(from, to, label, cls) {
+    const msg = document.createElement('div');
+    msg.className = 'flying-msg ' + cls;
+    msg.textContent = label;
+    diagram.appendChild(msg);
+
+    const dw = diagram.offsetWidth;
+    const positions = {
+      server: dw * 0.08 + 65,
+      'push-service': dw * 0.5,
+      device: dw * 0.92 - 65,
+    };
+
+    msg.style.left = positions[from] + 'px';
+    msg.style.opacity = '1';
+    await sleep(60);
+    msg.style.left = positions[to] + 'px';
+    await sleep(750);
+    msg.style.opacity = '0';
+    await sleep(200);
+    if (msg.parentNode) diagram.removeChild(msg);
+  }
+
+  // --- Subscribe flow ---
+  async function doSubscribe() {
+    if (subscribed || animating) return;
+    animating = true;
+    subscribeBtn.disabled = true;
+
+    addLog('DEVICE', 'device', 'navigator.serviceWorker.register("sw.js")');
+    await sleep(400);
+
+    addLog('DEVICE', 'device', 'Notification.requestPermission() ...');
+    await sleep(600);
+    addLog('DEVICE', 'device', 'User clicked "Allow" (permission granted)');
+    await sleep(300);
+
+    addLog('DEVICE', 'device', 'PushManager.subscribe({ applicationServerKey: VAPID_KEY })');
+    deviceIcon.classList.add('active');
+    await sleep(400);
+
+    // Device contacts push service
+    addLog('DEVICE', 'device', 'Contacting push service to create subscription...');
+    connRight.classList.add('active');
+    await flyMessage('device', 'push-service', 'Subscribe', 'push');
+    pushIcon.classList.add('active');
+    await sleep(300);
+
+    addLog('PUSH SERVICE', 'push-service', 'Created subscription endpoint: https://fcm.googleapis.com/fcm/send/abc...');
+    await flyMessage('push-service', 'device', 'Subscription', 'push');
+    connRight.classList.remove('active');
+    pushIcon.classList.remove('active');
+
+    addLog('DEVICE', 'device', 'PushSubscription { endpoint, keys: { p256dh, auth } }');
+    await sleep(300);
+
+    // Send subscription to server
+    addLog('DEVICE', 'device', 'POST /subscribe { endpoint, keys } to FoodDash server');
+    await flyMessage('device', 'server', 'Subscription', 'encrypted');
+    serverIcon.classList.add('active');
+    await sleep(300);
+
+    addLog('SERVER', 'server', 'Subscription stored (~200 bytes). Ready to push.');
+    addLog('SERVER', 'server', 'Compare: WebSocket would need ~30,000 bytes of persistent state');
+    serverIcon.classList.remove('active');
+    deviceIcon.classList.remove('active');
+
+    subscribed = true;
+    sendPushBtn.disabled = false;
+    offlinePushBtn.disabled = false;
+    compareBtn.disabled = false;
+
+    diagramStatus.textContent = 'Subscribed — ready to receive pushes';
+    animating = false;
+  }
+
+  // --- Send push flow (app open) ---
+  async function doSendPush() {
+    if (!subscribed || animating) return;
+    animating = true;
+    sendPushBtn.disabled = true;
+
+    const notif = notifications[pushCount % notifications.length];
+    pushCount++;
+
+    addLog('SERVER', 'server', `Event: "${notif.title}" — need to notify customer`);
+    await sleep(300);
+
+    // Show encryption steps
+    encryptionPanel.classList.add('visible');
+    resetEncSteps();
+
+    const encSteps = [
+      { id: 'enc1', log: 'Generating ephemeral ECDH key pair (P-256)...' },
+      { id: 'enc2', log: 'ECDH key agreement with subscription.p256dh -> shared_secret' },
+      { id: 'enc3', log: 'HKDF-SHA256(shared_secret, auth) -> AES key + nonce' },
+      { id: 'enc4', log: `AES-128-GCM encrypting: "${notif.title}"` },
+      { id: 'enc5', log: 'Sending encrypted payload to push service endpoint' },
+    ];
+
+    for (const step of encSteps) {
+      setEncStep(step.id, 'active');
+      addLog('SERVER', 'server', step.log);
+      await sleep(400);
+      setEncStep(step.id, 'done');
+    }
+
+    // Server -> Push Service
+    serverIcon.classList.add('active');
+    connLeft.classList.add('active');
+    addLog('SERVER', 'server', 'POST https://fcm.googleapis.com/fcm/send/abc... (encrypted, VAPID auth)');
+    await flyMessage('server', 'push-service', 'Encrypted', 'encrypted');
+    connLeft.classList.remove('active');
+    serverIcon.classList.remove('active');
+
+    pushIcon.classList.add('active');
+    addLog('PUSH SERVICE', 'push-service', '201 Created — message queued for delivery');
+    addLog('PUSH SERVICE', 'push-service', 'Push service CANNOT read the payload (encrypted end-to-end)');
+    await sleep(300);
+
+    if (appOpen) {
+      // Push Service -> Device
+      connRight.classList.add('active');
+      addLog('PUSH SERVICE', 'push-service', 'Device is online — delivering immediately');
+      await flyMessage('push-service', 'device', 'Delivering...', 'notification');
+      connRight.classList.remove('active');
+      pushIcon.classList.remove('active');
+
+      deviceIcon.classList.add('active');
+      addLog('DEVICE', 'device', `Service Worker received push event`);
+      addLog('DEVICE', 'device', `Decrypted: "${notif.title}" — "${notif.body}"`);
+      addLog('DEVICE', 'device', 'self.registration.showNotification()');
+      showNotification(notif.title, notif.body);
+      await sleep(500);
+      deviceIcon.classList.remove('active');
+    } else {
+      // Device offline — hold message
+      addLog('PUSH SERVICE', 'push-service', 'Device is OFFLINE. Holding message until TTL expires...');
+      heldIndicator.classList.add('visible');
+      heldMessage = notif;
+      pushIcon.classList.remove('active');
+      addLog('INFO', 'info', 'Toggle "App Open" to see the held message get delivered');
+    }
+
+    sendPushBtn.disabled = false;
+    animating = false;
+  }
+
+  // --- Offline push scenario ---
+  async function doOfflinePush() {
+    if (!subscribed || animating) return;
+
+    // Close the app first
+    setDeviceState(false);
+    await sleep(500);
+
+    addLog('INFO', 'info', '--- OFFLINE PUSH SCENARIO ---');
+    addLog('INFO', 'info', 'App is closed. WebSocket would be dead. Push still works.');
+    await sleep(300);
+
+    // Send the push
+    await doSendPush();
+
+    await sleep(1500);
+
+    if (heldMessage) {
+      addLog('INFO', 'info', 'Simulating device coming back online in 3 seconds...');
+      await sleep(3000);
+
+      // Bring device back online
+      setDeviceState(true);
+    }
+  }
+
+  // --- Compare WS vs Push ---
+  async function doCompare() {
+    if (animating) return;
+    animating = true;
+    compareBtn.disabled = true;
+
+    addLog('INFO', 'info', '--- COMPARISON: WebSocket vs Push ---');
+    await sleep(300);
+
+    // Close app
+    setDeviceState(false);
+    await sleep(500);
+
+    addLog('INFO', 'info', 'Customer closes the app. WebSocket connection dies.');
+    addLog('INFO', 'info', 'Driver sends "I\'m downstairs" via WebSocket chat...');
+    await sleep(600);
+
+    addLog('ERROR', 'error', 'WebSocket: FAILED. Connection is dead. Message lost.');
+    addLog('ERROR', 'error', 'Driver: "I messaged the customer but they never responded"');
+    await sleep(1000);
+
+    addLog('INFO', 'info', 'Now trying with Push Notification...');
+    await sleep(500);
+
+    // Reset animation state for push flow
+    const notif = { title: "I'm Downstairs!", body: 'Driver Alice is at your building entrance.' };
+
+    addLog('SERVER', 'server', 'Encrypting push: "I\'m Downstairs!"');
+    serverIcon.classList.add('active');
+    await sleep(400);
+
+    connLeft.classList.add('active');
+    await flyMessage('server', 'push-service', 'Encrypted', 'encrypted');
+    connLeft.classList.remove('active');
+    serverIcon.classList.remove('active');
+
+    pushIcon.classList.add('active');
+    addLog('PUSH SERVICE', 'push-service', 'Message received. Device offline — holding...');
+    heldIndicator.classList.add('visible');
+    heldMessage = notif;
+    await sleep(400);
+    pushIcon.classList.remove('active');
+
+    await sleep(2000);
+
+    addLog('INFO', 'info', 'Customer picks up phone, opens any app...');
+    await sleep(1000);
+
+    setDeviceState(true);
+
+    // Wait for delivery animation to finish
+    await sleep(3000);
+
+    addLog('INFO', 'info', 'Push delivered the message even though the app was closed!');
+    addLog('INFO', 'info', 'WebSocket: requires active connection. Push: works offline.');
+
+    compareBtn.disabled = false;
+    animating = false;
+  }
+
+  // --- Reset ---
+  function doReset() {
+    subscribed = false;
+    animating = false;
+    heldMessage = null;
+    pushCount = 0;
+
+    subscribeBtn.disabled = false;
+    sendPushBtn.disabled = true;
+    offlinePushBtn.disabled = true;
+    compareBtn.disabled = true;
+
+    setDeviceState(true);
+    heldIndicator.classList.remove('visible');
+    notifPopup.classList.remove('visible');
+    encryptionPanel.classList.remove('visible');
+    connLeft.classList.remove('active', 'dead');
+    connRight.classList.remove('active', 'dead');
+    serverIcon.classList.remove('active');
+    pushIcon.classList.remove('active');
+    deviceIcon.classList.remove('active');
+    diagramStatus.textContent = 'Push notification flow';
+    resetEncSteps();
+
+    logEntries.innerHTML = `
+      <div class="log-entry">
+        <span class="log-time">--:--:--</span>
+        <span class="log-label info">INFO</span>
+        Click "Subscribe" to begin the push notification flow
+      </div>`;
+  }
+
+  // --- Event listeners ---
+  subscribeBtn.addEventListener('click', doSubscribe);
+  sendPushBtn.addEventListener('click', doSendPush);
+  offlinePushBtn.addEventListener('click', doOfflinePush);
+  compareBtn.addEventListener('click', doCompare);
+  resetBtn.addEventListener('click', doReset);
+
+  appOpenBtn.addEventListener('click', () => setDeviceState(true));
+  appClosedBtn.addEventListener('click', () => setDeviceState(false));
+})();
+</script>
+</body>
+</html>
