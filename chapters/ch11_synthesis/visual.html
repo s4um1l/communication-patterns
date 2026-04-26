@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch11 -- Synthesis: The Complete Decision Framework</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-card: #161b22;
+    --bg-hover: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --orange: #db6d28;
+    --purple: #bc8cff;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* --- Navigation --- */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(13, 17, 23, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .nav-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+  }
+
+  .nav-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .nav-links a:hover, .nav-links a.active {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+
+  /* --- Sections --- */
+  section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h2 {
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--accent);
+  }
+
+  .section-subtitle {
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+
+  /* --- Architecture Diagram --- */
+  .arch-container {
+    position: relative;
+    width: 100%;
+    min-height: 620px;
+    margin: 1.5rem 0;
+  }
+
+  .arch-node {
+    position: absolute;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 140px;
+    text-align: center;
+  }
+
+  .arch-node:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .arch-node.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+  }
+
+  .arch-node .node-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .arch-node .node-pattern {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+
+  .arch-node[data-pattern="request-response"] { border-color: var(--green); }
+  .arch-node[data-pattern="sse"] { border-color: var(--cyan); }
+  .arch-node[data-pattern="websocket"] { border-color: var(--purple); }
+  .arch-node[data-pattern="push"] { border-color: var(--yellow); }
+  .arch-node[data-pattern="pubsub"] { border-color: var(--accent); }
+  .arch-node[data-pattern="stateless"] { border-color: var(--text-dim); }
+  .arch-node[data-pattern="multiplexing"] { border-color: var(--orange); }
+  .arch-node[data-pattern="sidecar"] { border-color: var(--pink); }
+
+  .arch-node.selected[data-pattern="request-response"] { box-shadow: 0 0 20px rgba(63,185,80,0.3); }
+  .arch-node.selected[data-pattern="sse"] { box-shadow: 0 0 20px rgba(57,210,192,0.3); }
+  .arch-node.selected[data-pattern="websocket"] { box-shadow: 0 0 20px rgba(188,140,255,0.3); }
+  .arch-node.selected[data-pattern="push"] { box-shadow: 0 0 20px rgba(210,153,34,0.3); }
+  .arch-node.selected[data-pattern="pubsub"] { box-shadow: 0 0 20px rgba(88,166,255,0.3); }
+  .arch-node.selected[data-pattern="multiplexing"] { box-shadow: 0 0 20px rgba(219,109,40,0.3); }
+  .arch-node.selected[data-pattern="sidecar"] { box-shadow: 0 0 20px rgba(247,120,186,0.3); }
+
+  .arch-info {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    min-height: 100px;
+    transition: all 0.3s;
+  }
+
+  .arch-info .info-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .arch-info .info-pattern {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  .arch-info .info-desc {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  /* --- Architecture SVG arrows --- */
+  .arch-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .arch-svg line {
+    stroke: var(--border);
+    stroke-width: 2;
+    stroke-dasharray: 6, 4;
+    opacity: 0.6;
+  }
+
+  /* --- Heatmap --- */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: 180px repeat(6, 1fr);
+    gap: 2px;
+    margin: 1.5rem 0;
+    font-size: 0.85rem;
+  }
+
+  .heatmap-header {
+    background: var(--bg-hover);
+    padding: 0.75rem 0.5rem;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 0.8rem;
+  }
+
+  .heatmap-row-label {
+    background: var(--bg-card);
+    padding: 0.75rem 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    font-size: 0.82rem;
+  }
+
+  .heatmap-cell {
+    padding: 0.6rem 0.4rem;
+    text-align: center;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: default;
+    transition: transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+  }
+
+  .heatmap-cell:hover {
+    transform: scale(1.05);
+    z-index: 2;
+  }
+
+  .heat-low {
+    background: rgba(63, 185, 80, 0.2);
+    color: var(--green);
+  }
+
+  .heat-med {
+    background: rgba(210, 153, 34, 0.2);
+    color: var(--yellow);
+  }
+
+  .heat-high {
+    background: rgba(248, 81, 73, 0.2);
+    color: var(--red);
+  }
+
+  .heat-varies {
+    background: rgba(188, 140, 255, 0.15);
+    color: var(--purple);
+  }
+
+  .heatmap-cell .cell-label {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    font-weight: 400;
+  }
+
+  /* --- Decision Flowchart --- */
+  .flowchart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+  }
+
+  .flow-question {
+    background: var(--bg-hover);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+
+  .flow-question.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px rgba(88, 166, 255, 0.15);
+  }
+
+  .flow-question.answered {
+    opacity: 0.5;
+    border-color: var(--green);
+  }
+
+  .flow-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .flow-btn {
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-sans);
+  }
+
+  .flow-btn:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+  }
+
+  .flow-btn.selected {
+    border-color: var(--green);
+    background: rgba(63, 185, 80, 0.1);
+    color: var(--green);
+  }
+
+  .flow-result {
+    background: rgba(63, 185, 80, 0.1);
+    border: 2px solid var(--green);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin: 1.5rem auto;
+    max-width: 600px;
+    text-align: center;
+  }
+
+  .flow-result h3 {
+    color: var(--green);
+    margin: 0 0 0.5rem;
+  }
+
+  .flow-result p {
+    color: var(--text-dim);
+  }
+
+  .flow-restart {
+    display: block;
+    margin: 1.5rem auto 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .flow-restart:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* --- Comparison Slider --- */
+  .compare-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 1.5rem 0;
+  }
+
+  .compare-controls select {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    min-width: 200px;
+  }
+
+  .compare-controls select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .compare-vs {
+    font-weight: 700;
+    color: var(--text-dim);
+    font-size: 1.2rem;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 180px 1fr;
+    gap: 0;
+    margin: 1.5rem 0;
+  }
+
+  .compare-col {
+    padding: 0;
+  }
+
+  .compare-col-header {
+    text-align: center;
+    padding: 1rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 0.5rem;
+  }
+
+  .compare-col-header.left { color: var(--cyan); border-color: var(--cyan); }
+  .compare-col-header.center { color: var(--text-dim); font-size: 0.85rem; }
+  .compare-col-header.right { color: var(--orange); border-color: var(--orange); }
+
+  .compare-row {
+    display: contents;
+  }
+
+  .compare-cell {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+    font-size: 0.9rem;
+  }
+
+  .compare-cell.left { text-align: right; }
+  .compare-cell.center {
+    text-align: center;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .compare-cell.right { text-align: left; }
+
+  .compare-cell.winner { color: var(--green); font-weight: 600; }
+  .compare-cell.loser { color: var(--text-dim); }
+
+  /* --- Legend --- */
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  .legend-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 900px) {
+    .heatmap-grid { font-size: 0.7rem; }
+    .arch-container { min-height: 500px; }
+    .compare-grid { grid-template-columns: 1fr 120px 1fr; }
+    section { padding: 2rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav">
+  <div class="nav-title">Ch11 Synthesis</div>
+  <div class="nav-links">
+    <a href="#architecture" class="active">Architecture</a>
+    <a href="#heatmap">Heatmap</a>
+    <a href="#flowchart">Decision Flow</a>
+    <a href="#compare">Compare</a>
+  </div>
+</nav>
+
+<!-- ======================================================================= -->
+<!-- SECTION 1: Architecture Diagram -->
+<!-- ======================================================================= -->
+<section id="architecture">
+  <h2>The Full FoodDash Architecture</h2>
+  <p class="section-subtitle">Click any component to see which pattern it uses and why.</p>
+
+  <div class="arch-container" id="archDiagram">
+    <svg class="arch-svg" id="archSvg"></svg>
+
+    <div class="arch-node" data-pattern="request-response" data-info="customer"
+         style="left: 2%; top: 35%; width: 145px;">
+      <div class="node-label">Customer App</div>
+      <div class="node-pattern">HTTP + SSE + Push</div>
+    </div>
+
+    <div class="arch-node" data-pattern="stateless" data-info="gateway"
+         style="left: 22%; top: 25%; width: 165px;">
+      <div class="node-label">API Gateway</div>
+      <div class="node-pattern">Stateless (Ch08)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="multiplexing" data-info="mux"
+         style="left: 22%; top: 52%; width: 165px;">
+      <div class="node-label">HTTP/2 Mux</div>
+      <div class="node-pattern">Multiplexing (Ch09)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="request-response" data-info="orderservice"
+         style="left: 44%; top: 35%; width: 155px;">
+      <div class="node-label">Order Service</div>
+      <div class="node-pattern">Req-Resp (Ch01)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="pubsub" data-info="eventbus"
+         style="left: 64%; top: 5%; width: 175px;">
+      <div class="node-label">Event Bus</div>
+      <div class="node-pattern">Pub/Sub (Ch07)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="pubsub" data-info="kitchen"
+         style="left: 82%; top: 0%; width: 130px;">
+      <div class="node-label">Kitchen</div>
+      <div class="node-pattern">Subscriber</div>
+    </div>
+
+    <div class="arch-node" data-pattern="pubsub" data-info="billing"
+         style="left: 82%; top: 18%; width: 130px;">
+      <div class="node-label">Billing</div>
+      <div class="node-pattern">Subscriber</div>
+    </div>
+
+    <div class="arch-node" data-pattern="pubsub" data-info="drivermatch"
+         style="left: 82%; top: 36%; width: 130px;">
+      <div class="node-label">Driver Match</div>
+      <div class="node-pattern">Subscriber</div>
+    </div>
+
+    <div class="arch-node" data-pattern="pubsub" data-info="notifications"
+         style="left: 82%; top: 54%; width: 130px;">
+      <div class="node-label">Notifications</div>
+      <div class="node-pattern">Subscriber</div>
+    </div>
+
+    <div class="arch-node" data-pattern="sse" data-info="sse"
+         style="left: 2%; top: 70%; width: 145px;">
+      <div class="node-label">SSE Stream</div>
+      <div class="node-pattern">SSE (Ch04)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="websocket" data-info="ws"
+         style="left: 22%; top: 80%; width: 145px;">
+      <div class="node-label">Chat (WS)</div>
+      <div class="node-pattern">WebSocket (Ch05)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="push" data-info="push"
+         style="left: 44%; top: 75%; width: 155px;">
+      <div class="node-label">Push Service</div>
+      <div class="node-pattern">Push (Ch06)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="sidecar" data-info="sidecar"
+         style="left: 64%; top: 75%; width: 175px;">
+      <div class="node-label">Sidecar Proxies</div>
+      <div class="node-pattern">Sidecar (Ch10)</div>
+    </div>
+
+    <div class="arch-node" data-pattern="websocket" data-info="driver"
+         style="left: 44%; top: 55%; width: 155px;">
+      <div class="node-label">Driver App</div>
+      <div class="node-pattern">WS + Push</div>
+    </div>
+  </div>
+
+  <div class="arch-info" id="archInfo">
+    <div class="info-title">Click a component</div>
+    <div class="info-pattern"></div>
+    <div class="info-desc">Select any node in the architecture diagram above to see which communication pattern it uses, why that pattern was chosen, and what alternatives were considered.</div>
+  </div>
+</section>
+
+<!-- ======================================================================= -->
+<!-- SECTION 2: Constraint Heatmap -->
+<!-- ======================================================================= -->
+<section id="heatmap">
+  <h2>Constraint Heatmap</h2>
+  <p class="section-subtitle">Resource profile of every pattern. Green = low cost. Yellow = moderate. Red = high cost.</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background: rgba(63,185,80,0.35);"></div> Low</div>
+    <div class="legend-item"><div class="legend-swatch" style="background: rgba(210,153,34,0.35);"></div> Medium</div>
+    <div class="legend-item"><div class="legend-swatch" style="background: rgba(248,81,73,0.35);"></div> High</div>
+    <div class="legend-item"><div class="legend-swatch" style="background: rgba(188,140,255,0.25);"></div> Varies</div>
+  </div>
+
+  <div class="heatmap-grid" id="heatmapGrid">
+    <!-- Populated by JS -->
+  </div>
+</section>
+
+<!-- ======================================================================= -->
+<!-- SECTION 3: Interactive Decision Flowchart -->
+<!-- ======================================================================= -->
+<section id="flowchart">
+  <h2>Decision Flowchart</h2>
+  <p class="section-subtitle">Answer questions about your requirements. Get a pattern recommendation.</p>
+
+  <div class="flowchart-container" id="flowchartContainer">
+    <!-- Populated by JS -->
+  </div>
+</section>
+
+<!-- ======================================================================= -->
+<!-- SECTION 4: Side-by-Side Comparison -->
+<!-- ======================================================================= -->
+<section id="compare">
+  <h2>Pattern Comparison</h2>
+  <p class="section-subtitle">Pick any two patterns and compare them across every dimension.</p>
+
+  <div class="compare-controls">
+    <select id="compareLeft"></select>
+    <span class="compare-vs">vs</span>
+    <select id="compareRight"></select>
+  </div>
+
+  <div class="compare-grid" id="compareGrid">
+    <!-- Populated by JS -->
+  </div>
+</section>
+
+<script>
+// =========================================================================
+// Data
+// =========================================================================
+
+const PATTERNS = [
+  { id: 'req-resp', name: 'Request-Response', ch: 'Ch01', color: '#3fb950' },
+  { id: 'short-poll', name: 'Short Polling', ch: 'Ch02', color: '#3fb950' },
+  { id: 'long-poll', name: 'Long Polling', ch: 'Ch03', color: '#39d2c0' },
+  { id: 'sse', name: 'Server-Sent Events', ch: 'Ch04', color: '#39d2c0' },
+  { id: 'websocket', name: 'WebSocket', ch: 'Ch05', color: '#bc8cff' },
+  { id: 'push', name: 'Push Notifications', ch: 'Ch06', color: '#d29922' },
+  { id: 'pubsub', name: 'Pub/Sub', ch: 'Ch07', color: '#58a6ff' },
+  { id: 'stateful', name: 'Stateful vs Stateless', ch: 'Ch08', color: '#8b949e' },
+  { id: 'mux', name: 'Multiplexing', ch: 'Ch09', color: '#db6d28' },
+  { id: 'sidecar', name: 'Sidecar', ch: 'Ch10', color: '#f778ba' },
+];
+
+// Heatmap data: [cpu, memory, network, latency, complexity, scalability]
+// L=low, M=medium, H=high, V=varies
+const HEATMAP = {
+  'req-resp':   ['L','L','L','M','L','H'],
+  'short-poll': ['M','L','H','H','L','H'],
+  'long-poll':  ['L','M','L','L','M','M'],
+  'sse':        ['L','M','L','L','M','M'],
+  'websocket':  ['M','H','M','L','H','L'],
+  'push':       ['L','L','L','H','M','H'],
+  'pubsub':     ['M','M','M','L','M','H'],
+  'stateful':   ['V','H','L','L','H','L'],
+  'mux':        ['M','M','L','L','H','H'],
+  'sidecar':    ['M','M','L','L','M','H'],
+};
+
+const HEATMAP_COLS = ['CPU', 'Memory', 'Network I/O', 'Latency', 'Complexity', 'Scalability'];
+
+// For scalability, HIGH is good. For the rest, LOW is good.
+// The cell tooltip explains the nuance.
+const HEATMAP_TIPS = {
+  'req-resp':   ['One thread per request, released immediately', 'No state between requests', 'One round trip per operation', 'Blocked until response arrives', 'Simplest possible model', 'Stateless: horizontal scaling trivial'],
+  'short-poll': ['Repeated request parsing each interval', 'No server-side state between polls', 'N polls/interval, most return empty', 'Up to one full interval of staleness', 'Just a timer + HTTP calls', 'Stateless but wastes bandwidth at scale'],
+  'long-poll':  ['Thread held idle, minimal processing', 'One held connection per waiting client', 'Only transmits when data exists', 'Near-instant when event fires', 'Timeout handling, reconnection logic', 'Held connections consume server resources'],
+  'sse':        ['Kernel handles idle connections efficiently', 'One persistent connection per client', 'Server pushes only when events exist', 'Events arrive within milliseconds', 'Reconnection, event ID tracking', 'Persistent connections limit max clients/server'],
+  'websocket':  ['Frame parsing, per-message callbacks', 'Per-connection state, buffers both directions', 'Binary framing efficient, but always-on', 'Sub-ms after connection established', 'State management, heartbeats, reconnection', 'Stateful connections hard to load-balance'],
+  'push':       ['Fire and forget from server perspective', 'No server-side connection state', 'One message per event via platform', 'Delivery depends on OS, battery, network', 'Platform-specific APIs, token management', 'Platform handles fan-out (APNs/FCM)'],
+  'pubsub':     ['Broker routes every message to N subscribers', 'Broker holds topics, subscriptions, unacked msgs', 'One publish fans out to N deliveries', 'Broker adds one hop of latency', 'Topic design, ordering, at-least-once', 'Brokers designed for horizontal scaling'],
+  'stateful':   ['May cache (saves CPU) or hold state', 'Per-connection buffers, session state', 'Standard request patterns', 'Low if cached, medium if re-fetched', 'State migration, sticky sessions', 'Sticky sessions limit horizontal scaling'],
+  'mux':        ['Stream management, priority, flow control', 'Per-stream buffers and state', 'One TCP connection carries N streams', 'No head-of-line blocking across streams', 'Stream IDs, flow control, prioritization', 'Fewer connections = better reuse'],
+  'sidecar':    ['Extra hop through proxy per request', 'Proxy process per service instance', 'Localhost communication: negligible overhead', 'Adds ~1-2ms per hop (localhost)', 'Deployment orchestration, config management', 'Decouple cross-cutting from app scaling'],
+};
+
+// Comparison data
+const COMPARE_DATA = {
+  'req-resp':   { direction: 'Client -> Server', connection: 'Short-lived', browser: 'fetch / XHR', reconnect: 'N/A (new connection)', ordering: 'Per-request', maxClients: '10K+', firewall: 'Always works', binary: 'Yes', bestCase: 'CRUD APIs, form submissions', worstCase: 'Live dashboards' },
+  'short-poll': { direction: 'Client -> Server (repeated)', connection: 'Short-lived (repeated)', browser: 'fetch + setInterval', reconnect: 'Next poll', ordering: 'None (gaps possible)', maxClients: '10K+ (wasteful)', firewall: 'Always works', binary: 'Yes', bestCase: 'Simple status checks, batch jobs', worstCase: 'High-freq updates (self-DDoS)' },
+  'long-poll':  { direction: 'Client -> Server (held)', connection: 'Medium-lived', browser: 'fetch (long timeout)', reconnect: 'Client re-sends request', ordering: 'Sequential', maxClients: '5K-10K', firewall: 'Usually works', binary: 'Yes', bestCase: 'Chat, moderate-traffic notifications', worstCase: 'Very high concurrency' },
+  'sse':        { direction: 'Server -> Client', connection: 'Long-lived (persistent)', browser: 'EventSource API', reconnect: 'Auto (Last-Event-ID)', ordering: 'Guaranteed (TCP)', maxClients: '10K-50K', firewall: 'Yes (HTTP)', binary: 'No (text only)', bestCase: 'Live feeds, order tracking, tickers', worstCase: 'Bidirectional communication' },
+  'websocket':  { direction: 'Bidirectional', connection: 'Long-lived (persistent)', browser: 'WebSocket API', reconnect: 'Manual (app must handle)', ordering: 'Guaranteed (TCP)', maxClients: '10K-50K', firewall: 'Sometimes blocked', binary: 'Yes', bestCase: 'Chat, collab editing, games', worstCase: 'Simple notification feeds' },
+  'push':       { direction: 'Server -> Device', connection: 'None (fire-and-forget)', browser: 'Web Push API (partial)', reconnect: 'Platform handles retry', ordering: 'Best-effort', maxClients: 'Unlimited (platform)', firewall: 'Yes (platform route)', binary: 'Yes (limited payload)', bestCase: 'Offline alerts: delivery, breaking news', worstCase: 'Real-time in-app updates' },
+  'pubsub':     { direction: 'Pub -> Broker -> Sub', connection: 'Persistent to broker', browser: 'N/A (backend)', reconnect: 'Broker redelivers unacked', ordering: 'Per-partition', maxClients: 'Broker-dependent', firewall: 'Internal only', binary: 'Yes', bestCase: 'Event-driven microservices, fan-out', worstCase: 'Simple two-service comm' },
+  'stateful':   { direction: 'N/A (architecture)', connection: 'Varies', browser: 'N/A', reconnect: 'Complex (state sync)', ordering: 'Depends on pattern', maxClients: 'Limited by memory', firewall: 'N/A', binary: 'N/A', bestCase: 'WS servers, game servers (with plan)', worstCase: 'Commodity HTTP APIs' },
+  'mux':        { direction: 'Bidirectional (multi-stream)', connection: 'Long-lived (1 conn, N streams)', browser: 'HTTP/2 automatic', reconnect: 'Per-stream reset', ordering: 'Per-stream guaranteed', maxClients: '50K+', firewall: 'Yes (HTTP/2)', binary: 'Yes', bestCase: 'Many concurrent requests, gRPC', worstCase: 'Single infrequent request' },
+  'sidecar':    { direction: 'Transparent proxy', connection: 'Per-request passthrough', browser: 'N/A (infrastructure)', reconnect: 'Sidecar handles retry', ordering: 'Preserves underlying', maxClients: 'Same as app', firewall: 'Internal only', binary: 'Yes', bestCase: 'Service mesh, consistent cross-cutting', worstCase: 'Monoliths, < 3 services' },
+};
+
+const COMPARE_FIELDS = [
+  ['direction', 'Direction'],
+  ['connection', 'Connection Model'],
+  ['browser', 'Browser API'],
+  ['reconnect', 'Reconnection'],
+  ['ordering', 'Ordering'],
+  ['maxClients', 'Max Clients/Server'],
+  ['firewall', 'Firewall Friendly'],
+  ['binary', 'Binary Data'],
+  ['bestCase', 'Best Use Case'],
+  ['worstCase', 'Worst Use Case'],
+];
+
+// Architecture node info
+const ARCH_INFO = {
+  customer: {
+    title: 'Customer Mobile App',
+    pattern: 'Uses: Request-Response (Ch01), SSE (Ch04), Push (Ch06)',
+    desc: 'The customer app uses HTTP request-response for placing orders and fetching menus. It receives real-time order updates via an SSE stream. When the app is backgrounded, push notifications alert the user about important events like "your food is arriving."',
+  },
+  gateway: {
+    title: 'API Gateway',
+    pattern: 'Stateless (Ch08)',
+    desc: 'The gateway holds no per-client state. Any gateway instance can handle any request. This enables simple horizontal scaling: add more instances behind a load balancer. No sticky sessions, no state migration, no split-brain problems.',
+  },
+  mux: {
+    title: 'HTTP/2 Multiplexed Connection',
+    pattern: 'Multiplexing (Ch09)',
+    desc: 'A single TCP connection from each client carries multiple concurrent streams: API requests, the SSE event stream, and asset downloads. This eliminates the 6-connection-per-host limit of HTTP/1.1 and reduces TCP handshake overhead.',
+  },
+  orderservice: {
+    title: 'Order Service',
+    pattern: 'Request-Response (Ch01) + Pub/Sub producer (Ch07)',
+    desc: 'The order service receives HTTP requests (create order, update status) and responds synchronously. After each state change, it publishes an event to the event bus. It does NOT call other services directly -- it just publishes and moves on.',
+  },
+  eventbus: {
+    title: 'Event Bus',
+    pattern: 'Pub/Sub (Ch07)',
+    desc: 'The event bus (Kafka, Redis Streams, or similar) decouples the order service from all downstream consumers. When an order is placed, the event bus delivers the event to the kitchen, billing, driver match, and notification services independently. If one consumer is slow, the others are unaffected.',
+  },
+  kitchen: {
+    title: 'Kitchen Service',
+    pattern: 'Pub/Sub Subscriber (Ch07)',
+    desc: 'Subscribes to order.placed events. When a new order arrives, it adds it to the kitchen queue. It does not know or care about the order service, billing, or drivers. Full decoupling.',
+  },
+  billing: {
+    title: 'Billing Service',
+    pattern: 'Pub/Sub Subscriber (Ch07)',
+    desc: 'Subscribes to order.placed events to process payment. If billing is slow or temporarily down, the order still proceeds -- the event bus retries delivery. This is the key advantage over synchronous calls.',
+  },
+  drivermatch: {
+    title: 'Driver Match Service',
+    pattern: 'Pub/Sub Subscriber (Ch07)',
+    desc: 'Subscribes to order.confirmed events. Finds the nearest available driver and assigns them. Publishes driver.assigned so the notification service can alert the customer.',
+  },
+  notifications: {
+    title: 'Notification Service',
+    pattern: 'Pub/Sub Subscriber (Ch07) + SSE (Ch04) + Push (Ch06)',
+    desc: 'The notification service is the routing layer. It subscribes to all order events and decides HOW to deliver each notification: SSE for online users, push for offline users, WebSocket for real-time chat context.',
+  },
+  sse: {
+    title: 'SSE Event Stream',
+    pattern: 'Server-Sent Events (Ch04)',
+    desc: 'A persistent HTTP connection that streams order status updates to the customer. The server pushes events as they happen: confirmed, preparing, ready, picked up, en route, delivered. The client never polls. If the connection drops, EventSource auto-reconnects with Last-Event-ID.',
+  },
+  ws: {
+    title: 'Customer-Driver Chat',
+    pattern: 'WebSocket (Ch05)',
+    desc: 'A bidirectional WebSocket connection between the customer and their assigned driver. Both sides can send messages at any time. This is one of the few places where WebSocket is truly necessary -- SSE would not work because the customer also needs to send messages.',
+  },
+  push: {
+    title: 'Push Notification Service',
+    pattern: 'Push Notifications (Ch06)',
+    desc: 'When the customer locks their phone or switches apps, the SSE stream eventually disconnects. Push notifications bridge this gap: "Your driver is arriving!" reaches the user through APNs (Apple) or FCM (Google) even when the app is not running.',
+  },
+  sidecar: {
+    title: 'Sidecar Proxies',
+    pattern: 'Sidecar Pattern (Ch10)',
+    desc: 'Every microservice has a sidecar proxy (like Envoy) running alongside it. The sidecar handles JWT auth verification, request logging, rate limiting, circuit breaking, and distributed tracing. The services themselves contain only business logic. Change auth once, deploy one sidecar config -- all services are updated.',
+  },
+  driver: {
+    title: 'Driver App',
+    pattern: 'WebSocket (Ch05) + Push (Ch06)',
+    desc: 'The driver app maintains a WebSocket connection for real-time chat with customers and for receiving new delivery assignments. When the driver is not actively using the app, push notifications alert them to new orders.',
+  },
+};
+
+// Decision flowchart
+const FLOW_QUESTIONS = [
+  {
+    id: 'q1',
+    text: 'Does the client need to receive updates without explicitly requesting them?',
+    options: [
+      { label: 'No', next: 'result-rr' },
+      { label: 'Yes', next: 'q2' },
+    ],
+  },
+  {
+    id: 'q2',
+    text: 'Is the client always connected (online, app in foreground)?',
+    options: [
+      { label: 'No -- client may be offline or backgrounded', next: 'result-push' },
+      { label: 'Yes -- client is online', next: 'q3' },
+    ],
+  },
+  {
+    id: 'q3',
+    text: 'Does the client also need to SEND data in real-time (not just receive)?',
+    options: [
+      { label: 'No -- server pushes only', next: 'q4' },
+      { label: 'Yes -- bidirectional', next: 'result-ws' },
+    ],
+  },
+  {
+    id: 'q4',
+    text: 'How frequently do updates occur?',
+    options: [
+      { label: 'Rarely (< 1 per minute)', next: 'q5' },
+      { label: 'Frequently (> 1 per minute)', next: 'result-sse' },
+    ],
+  },
+  {
+    id: 'q5',
+    text: 'Can your infrastructure hold persistent connections? (No restrictive proxies/firewalls)',
+    options: [
+      { label: 'No -- restrictive environment', next: 'result-sp' },
+      { label: 'Yes', next: 'result-lp' },
+    ],
+  },
+];
+
+const FLOW_ARCH_QUESTIONS = [
+  {
+    id: 'qa1',
+    text: 'Do multiple services need to react to one event independently?',
+    options: [
+      { label: 'No', next: 'qa2' },
+      { label: 'Yes', next: 'result-pubsub' },
+    ],
+  },
+  {
+    id: 'qa2',
+    text: 'Does your service hold per-connection state (sessions, buffers, caches)?',
+    options: [
+      { label: 'No', next: 'qa3' },
+      { label: 'Yes', next: 'result-stateful' },
+    ],
+  },
+  {
+    id: 'qa3',
+    text: 'Does one client need multiple concurrent streams over a single connection?',
+    options: [
+      { label: 'No', next: 'qa4' },
+      { label: 'Yes', next: 'result-mux' },
+    ],
+  },
+  {
+    id: 'qa4',
+    text: 'Do all your services duplicate the same cross-cutting concerns (auth, logging, rate limiting)?',
+    options: [
+      { label: 'No', next: 'result-done' },
+      { label: 'Yes', next: 'result-sidecar' },
+    ],
+  },
+];
+
+const FLOW_RESULTS = {
+  'result-rr':      { title: 'Request-Response (Ch01)', desc: 'The simplest pattern. Client asks, server answers. Start here -- add complexity only when this pattern cannot meet your requirements.' },
+  'result-push':    { title: 'Push Notifications (Ch06)', desc: 'The client is not always connected. Use APNs (Apple), FCM (Google), or Web Push to reach users through the operating system.' },
+  'result-ws':      { title: 'WebSocket (Ch05)', desc: 'Both sides need to send data freely in real-time. Chat, collaborative editing, multiplayer games. More complex than SSE -- only use when bidirectionality is required.' },
+  'result-sse':     { title: 'Server-Sent Events (Ch04)', desc: 'Server pushes frequent updates to the client. Simpler than WebSocket, auto-reconnects, works through all HTTP proxies. Perfect for live feeds, order tracking, dashboards.' },
+  'result-sp':      { title: 'Short Polling (Ch02)', desc: 'The fallback when you cannot hold connections open. Simple timer-based HTTP requests. Wastes bandwidth but works everywhere.' },
+  'result-lp':      { title: 'Long Polling (Ch03)', desc: 'Client sends a request that the server holds open until data is available. Better than short polling for infrequent updates, but uses server connections while waiting.' },
+  'result-pubsub':  { title: 'Pub/Sub (Ch07)', desc: 'One event, many independent reactors. Decouples the publisher from all subscribers. Use Kafka, Redis Streams, or a managed service.' },
+  'result-stateful':{ title: 'Stateful vs Stateless (Ch08)', desc: 'Your server holds per-connection state. You need to plan for sticky sessions, state migration, or a shared state store. Consider if you can make it stateless instead.' },
+  'result-mux':     { title: 'Multiplexing (Ch09)', desc: 'Multiple concurrent streams over a single connection. HTTP/2 does this automatically. Reduces connection overhead and eliminates head-of-line blocking across streams.' },
+  'result-sidecar': { title: 'Sidecar Pattern (Ch10)', desc: 'Extract cross-cutting concerns into a proxy process that runs alongside each service. One deployment handles auth, logging, rate limiting for all services.' },
+  'result-done':    { title: 'You are covered!', desc: 'Your existing patterns handle this scenario. Review the constraint heatmap above to optimize resource usage.' },
+};
+
+
+// =========================================================================
+// Architecture Diagram
+// =========================================================================
+
+document.querySelectorAll('.arch-node').forEach(node => {
+  node.addEventListener('click', () => {
+    document.querySelectorAll('.arch-node').forEach(n => n.classList.remove('selected'));
+    node.classList.add('selected');
+
+    const infoKey = node.dataset.info;
+    const info = ARCH_INFO[infoKey];
+    if (info) {
+      const el = document.getElementById('archInfo');
+      el.querySelector('.info-title').textContent = info.title;
+      el.querySelector('.info-pattern').textContent = info.pattern;
+      el.querySelector('.info-desc').textContent = info.desc;
+    }
+  });
+});
+
+
+// =========================================================================
+// Heatmap
+// =========================================================================
+
+function renderHeatmap() {
+  const grid = document.getElementById('heatmapGrid');
+  let html = '';
+
+  // Header row
+  html += '<div class="heatmap-header"></div>';
+  HEATMAP_COLS.forEach(col => {
+    html += `<div class="heatmap-header">${col}</div>`;
+  });
+
+  // Data rows
+  PATTERNS.forEach(p => {
+    const vals = HEATMAP[p.id];
+    if (!vals) return;
+    html += `<div class="heatmap-row-label">${p.name}</div>`;
+    vals.forEach((v, i) => {
+      const cls = v === 'L' ? 'heat-low' : v === 'M' ? 'heat-med' : v === 'H' ? 'heat-high' : 'heat-varies';
+      const label = v === 'L' ? 'LOW' : v === 'M' ? 'MED' : v === 'H' ? 'HIGH' : 'VARIES';
+      const tip = HEATMAP_TIPS[p.id] ? HEATMAP_TIPS[p.id][i] : '';
+      html += `<div class="heatmap-cell ${cls}" title="${tip}">
+        ${label}
+        <span class="cell-label">${tip.substring(0, 30)}${tip.length > 30 ? '...' : ''}</span>
+      </div>`;
+    });
+  });
+
+  grid.innerHTML = html;
+}
+
+renderHeatmap();
+
+
+// =========================================================================
+// Decision Flowchart
+// =========================================================================
+
+let flowState = { mode: 'client', currentQ: 0, answers: [] };
+
+function renderFlowchart() {
+  const container = document.getElementById('flowchartContainer');
+  let html = '';
+
+  // Mode tabs
+  html += `<div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
+    <button class="flow-btn ${flowState.mode === 'client' ? 'selected' : ''}" onclick="setFlowMode('client')">Client-Facing Pattern</button>
+    <button class="flow-btn ${flowState.mode === 'arch' ? 'selected' : ''}" onclick="setFlowMode('arch')">Architecture Pattern</button>
+  </div>`;
+
+  const questions = flowState.mode === 'client' ? FLOW_QUESTIONS : FLOW_ARCH_QUESTIONS;
+
+  // Show answered questions
+  for (let i = 0; i < flowState.answers.length; i++) {
+    const q = questions[i];
+    if (!q) break;
+    const answer = flowState.answers[i];
+    html += `<div class="flow-question answered">
+      <div>${q.text}</div>
+      <div style="margin-top:0.5rem;color:var(--green);font-size:0.9rem;">You answered: ${answer.label}</div>
+    </div>`;
+  }
+
+  // Check if we have a result
+  const lastAnswer = flowState.answers[flowState.answers.length - 1];
+  if (lastAnswer && lastAnswer.next.startsWith('result-')) {
+    const result = FLOW_RESULTS[lastAnswer.next];
+    if (result) {
+      html += `<div class="flow-result">
+        <h3>${result.title}</h3>
+        <p>${result.desc}</p>
+      </div>`;
+    }
+    html += `<button class="flow-restart" onclick="resetFlow()">Start Over</button>`;
+  } else {
+    // Show current question
+    const currentQ = questions[flowState.answers.length];
+    if (currentQ) {
+      html += `<div class="flow-question active">
+        <div>${currentQ.text}</div>
+        <div class="flow-buttons">
+          ${currentQ.options.map((opt, j) =>
+            `<button class="flow-btn" onclick="answerFlow(${j})">${opt.label}</button>`
+          ).join('')}
+        </div>
+      </div>`;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+window.setFlowMode = function(mode) {
+  flowState = { mode, currentQ: 0, answers: [] };
+  renderFlowchart();
+};
+
+window.answerFlow = function(optIdx) {
+  const questions = flowState.mode === 'client' ? FLOW_QUESTIONS : FLOW_ARCH_QUESTIONS;
+  const q = questions[flowState.answers.length];
+  if (!q) return;
+  const opt = q.options[optIdx];
+  flowState.answers.push(opt);
+
+  // If the next is not a result, find the question index
+  if (!opt.next.startsWith('result-')) {
+    // The next question is identified by id, find its index
+    const nextIdx = questions.findIndex(qq => qq.id === opt.next);
+    // Ensure answers array length lines up
+    while (flowState.answers.length < nextIdx) {
+      // Skip questions (shouldn't happen in our linear flow, but safety)
+      flowState.answers.push({ label: '(skipped)', next: questions[flowState.answers.length].options[0].next });
+    }
+  }
+
+  renderFlowchart();
+};
+
+window.resetFlow = function() {
+  flowState.answers = [];
+  renderFlowchart();
+};
+
+renderFlowchart();
+
+
+// =========================================================================
+// Pattern Comparison
+// =========================================================================
+
+function renderComparison() {
+  const leftSel = document.getElementById('compareLeft');
+  const rightSel = document.getElementById('compareRight');
+
+  const leftId = leftSel.value;
+  const rightId = rightSel.value;
+  const leftP = PATTERNS.find(p => p.id === leftId);
+  const rightP = PATTERNS.find(p => p.id === rightId);
+  const leftD = COMPARE_DATA[leftId];
+  const rightD = COMPARE_DATA[rightId];
+
+  if (!leftD || !rightD) return;
+
+  const grid = document.getElementById('compareGrid');
+  let html = '';
+
+  // Headers
+  html += `<div class="compare-col-header left">${leftP.name}<br><span style="font-size:0.8rem;opacity:0.7;">${leftP.ch}</span></div>`;
+  html += `<div class="compare-col-header center">Property</div>`;
+  html += `<div class="compare-col-header right">${rightP.name}<br><span style="font-size:0.8rem;opacity:0.7;">${rightP.ch}</span></div>`;
+
+  // Rows
+  COMPARE_FIELDS.forEach(([key, label]) => {
+    const lv = leftD[key] || 'N/A';
+    const rv = rightD[key] || 'N/A';
+    html += `<div class="compare-cell left">${lv}</div>`;
+    html += `<div class="compare-cell center">${label}</div>`;
+    html += `<div class="compare-cell right">${rv}</div>`;
+  });
+
+  grid.innerHTML = html;
+}
+
+// Populate selects
+const leftSel = document.getElementById('compareLeft');
+const rightSel = document.getElementById('compareRight');
+
+PATTERNS.forEach(p => {
+  leftSel.add(new Option(`${p.ch}: ${p.name}`, p.id));
+  rightSel.add(new Option(`${p.ch}: ${p.name}`, p.id));
+});
+
+leftSel.value = 'sse';
+rightSel.value = 'websocket';
+
+leftSel.addEventListener('change', renderComparison);
+rightSel.addEventListener('change', renderComparison);
+
+renderComparison();
+
+
+// =========================================================================
+// Smooth scroll for nav
+// =========================================================================
+
+document.querySelectorAll('.nav-links a').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth' });
+      document.querySelectorAll('.nav-links a').forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+    }
+  });
+});
+
+// Highlight active nav on scroll
+const sections = document.querySelectorAll('section');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(section => {
+    const top = section.offsetTop - 100;
+    if (window.scrollY >= top) {
+      current = section.getAttribute('id');
+    }
+  });
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === '#' + current) {
+      link.classList.add('active');
+    }
+  });
+});
+</script>
+</body>
+</html>
