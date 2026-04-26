@@ -157,7 +157,7 @@ Using Little's Law: if FoodDash handles 100 orders/sec, each downstream call tak
 
 ---
 
-## Exercise 5 -- The Nagle-Delayed ACK Interaction [Principal]
+## Exercise 5 -- The Nagle-Delayed ACK Interaction [Advanced]
 
 **Question:** A FoodDash engineer notices that small JSON responses (< 100 bytes) from the order service sometimes take an extra 40ms to arrive. The network RTT is only 1ms. After investigation, they find the issue is the interaction between **Nagle's algorithm** and **TCP delayed ACK**.
 

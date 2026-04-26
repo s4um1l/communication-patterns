@@ -213,7 +213,7 @@ The bottleneck is no longer our server's connection capacity. It's the **platfor
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### VAPID Authentication
 

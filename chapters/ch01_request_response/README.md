@@ -138,7 +138,7 @@ Our server implements a simple version: it returns the order with a unique ID, a
 
 ## Systems Constraints Analysis
 
-Understanding the *resource profile* of a pattern is what separates a senior engineer from a principal. Here's what request-response costs:
+Understanding the *resource profile* of a pattern is what matters in production. Here's what request-response costs:
 
 ### CPU
 
@@ -217,7 +217,7 @@ Request-response can tell you the state **right now**, but it **cannot tell you 
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### Connection Pooling and HTTP Keep-Alive
 

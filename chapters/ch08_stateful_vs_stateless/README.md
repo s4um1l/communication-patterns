@@ -310,7 +310,7 @@ For latency-sensitive paths like chat messages, this matters. A human notices if
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### CAP Theorem Implications
 

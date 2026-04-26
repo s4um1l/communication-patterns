@@ -1,7 +1,7 @@
 [project]
 name = "communication-patterns"
 version = "0.1.0"
-description = "Principal-level educational repo on communication patterns — from request-response to sidecars, built through an evolving food delivery case study"
+description = "Deep-dive educational repo on communication patterns — from request-response to sidecars, built through an evolving food delivery case study"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

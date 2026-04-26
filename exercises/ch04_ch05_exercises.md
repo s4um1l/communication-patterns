@@ -219,7 +219,7 @@ An SSE stream is an HTTP response with `Content-Type: text/event-stream` that *n
 
 ---
 
-## Exercise 5 -- Design a Hybrid SSE + WebSocket System [Principal]
+## Exercise 5 -- Design a Hybrid SSE + WebSocket System [Advanced]
 
 **Design Problem:** FoodDash needs to support three real-time features simultaneously for each customer:
 

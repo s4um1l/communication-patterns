@@ -265,7 +265,7 @@ The server must now manage persistent connections. Each connection is a file des
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### HTTP/1.1 vs HTTP/2 for SSE
 

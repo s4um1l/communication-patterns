@@ -214,7 +214,7 @@ This statefulness problem is the core tension of WebSocket architecture and the 
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### Ping/Pong: WebSocket-Level Keepalive
 

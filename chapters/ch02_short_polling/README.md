@@ -393,10 +393,10 @@ the full 10 seconds if they are polling every 10s. That feels broken.
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 Short polling is often dismissed as "the wrong way" — but understanding its
-optimizations and valid use cases is what separates senior from principal
+optimizations and valid use cases is what matters in production
 engineers.
 
 ### Optimization 1: Adaptive Polling (Exponential Backoff)

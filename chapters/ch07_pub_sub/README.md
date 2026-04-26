@@ -227,7 +227,7 @@ Also: **message ordering is only guaranteed within a partition** (Kafka) or per-
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### Dead Letter Queues
 

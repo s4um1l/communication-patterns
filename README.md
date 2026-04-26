@@ -1,4 +1,4 @@
-# Communication Patterns — From First Principles to Principal-Level Mastery
+# Communication Patterns — From First Principles to Deep Mastery
 
 > **How do systems talk to each other?** This repo answers that question by building a food delivery platform ("FoodDash") from scratch, evolving from the simplest pattern (request-response) to sophisticated architectures (pub/sub, multiplexing, sidecars). Each chapter introduces a new pattern *because the previous one breaks* — you'll feel the pain before learning the cure.
 
@@ -11,7 +11,7 @@ Every chapter includes:
 - **Systems Constraints Analysis** — CPU, memory, network I/O, latency breakdowns
 - **Working Code** — runnable servers and clients, not pseudocode
 - **Interactive Visuals** — open `visual.html` in a browser to *see* the pattern in action
-- **Principal-Level Depth** — edge cases, failure modes, production gotchas
+- **Production Depth** — edge cases, failure modes, production gotchas
 
 ## The Learning Path
 
@@ -105,4 +105,4 @@ Every chapter analyzes the pattern through five system constraints:
 | **Latency** | Where time goes: propagation, serialization, queueing |
 | **Bottleneck Shift** | Which constraint relaxes — and which tightens |
 
-This builds the muscle to reason about trade-offs like a principal engineer.
+This builds the muscle to reason about trade-offs about systems at depth.

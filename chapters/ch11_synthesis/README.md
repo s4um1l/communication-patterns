@@ -142,7 +142,7 @@ flowchart TD
 
 ## The Constraint Heatmap
 
-This is the signature visual of this project. Every pattern has a resource profile. Understanding these profiles is what separates a senior engineer from a principal engineer.
+This is the signature visual of this project. Every pattern has a resource profile. Understanding these profiles is what matters when you're designing systems at scale.
 
 ### Resource Costs
 
@@ -381,6 +381,6 @@ The 10 patterns in this repository are not 10 alternatives. They are tools in a 
 | **Efficiency** | Multiplexing (Ch09) | Many streams, one connection |
 | **Infrastructure** | Sidecar (Ch10) | Cross-cutting concerns, extracted |
 
-The principal engineer's skill is not memorizing these patterns. It is recognizing which combination of patterns solves the problem at hand with the lowest total cost -- in complexity, in resources, and in operational burden.
+The real skill is not memorizing these patterns. It is recognizing which combination of patterns solves the problem at hand with the lowest total cost -- in complexity, in resources, and in operational burden.
 
 Start with request-response. Add patterns only when a specific limitation forces your hand. And when you add a pattern, understand its full constraint profile -- not just what it enables, but what it costs.

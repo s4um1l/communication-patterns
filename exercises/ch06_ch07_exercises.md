@@ -257,7 +257,7 @@ APNs / FCM  (HTTP/2 multiplexed)
 
 ---
 
-## Exercise 5 -- Design an Event-Driven Order Pipeline [Principal]
+## Exercise 5 -- Design an Event-Driven Order Pipeline [Advanced]
 
 **Design Problem:** Redesign FoodDash's order flow using pub/sub, replacing the synchronous chain from Ch07's introduction:
 

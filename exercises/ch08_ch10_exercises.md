@@ -238,7 +238,7 @@ Each service gets a sidecar container that handles all cross-cutting concerns. T
 
 ---
 
-## Exercise 5 -- Multi-Pattern Architecture Audit [Principal]
+## Exercise 5 -- Multi-Pattern Architecture Audit [Advanced]
 
 **Design Problem:** You inherit FoodDash's production architecture. Audit it for correctness, efficiency, and failure modes.
 

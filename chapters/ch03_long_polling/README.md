@@ -243,7 +243,7 @@ We traded **network I/O waste** (thousands of empty responses) for **memory pres
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### Connection Limits and OS Tuning
 

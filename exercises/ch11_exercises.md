@@ -2,7 +2,7 @@
 
 ---
 
-## Exercise 1 -- Stock Trading Platform [Principal]
+## Exercise 1 -- Stock Trading Platform [Advanced]
 
 **Design Problem:** Design the notification system for a stock trading platform where:
 
@@ -94,7 +94,7 @@ Also deduplicate at the exchange feed level: each price update has a sequence nu
 
 ---
 
-## Exercise 2 -- Collaborative Document Editor [Principal]
+## Exercise 2 -- Collaborative Document Editor [Advanced]
 
 **Design Problem:** Build the real-time communication layer for a Google Docs-like collaborative editor.
 
@@ -284,7 +284,7 @@ At 10K robots: ~50MB for MQTT connections. Trivial. Video is the expensive part 
 
 ---
 
-## Exercise 5 -- Failure Mode Analysis [Principal]
+## Exercise 5 -- Failure Mode Analysis [Advanced]
 
 **Design Problem:** FoodDash is running the full stack. On Black Friday, traffic is 10x normal. Analyze the failure cascade and design circuit breakers.
 

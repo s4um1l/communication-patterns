@@ -254,7 +254,7 @@ Alternatively, use `asyncio.Event` instead of individual futures -- one event pe
 
 ---
 
-## Exercise 5 -- Short Polling vs Long Polling Decision Framework [Principal]
+## Exercise 5 -- Short Polling vs Long Polling Decision Framework [Advanced]
 
 **Design Problem:** You're consulting for three different companies. For each, decide whether short polling or long polling is the better fit. Justify with specific numbers.
 

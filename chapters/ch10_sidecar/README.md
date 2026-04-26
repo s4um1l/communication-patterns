@@ -282,7 +282,7 @@ For most web applications (50-500ms response times), 1-3ms is acceptable. For la
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### Envoy Proxy Internals
 

@@ -19,7 +19,7 @@ and you will understand the CPU, memory, and latency cost of every step.
 2. [HTTP on Top of TCP](#http-on-top-of-tcp)
 3. [TLS: Encrypting the Channel](#tls-encrypting-the-channel)
 4. [Systems Constraints Analysis](#systems-constraints-analysis)
-5. [Principal-Level Depth](#principal-level-depth)
+5. [Production Depth](#production-depth)
 6. [Trade-offs](#trade-offs)
 7. [Running the Code](#running-the-code)
 8. [Bridge to Chapter 01](#bridge-to-chapter-01)
@@ -432,9 +432,9 @@ A customer in Mumbai hitting our Virginia server (~150ms RTT):
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
-These are the details that separate senior engineers from principal engineers. Each of
+These are the details that matter in production. Each of
 these has caused production incidents at scale.
 
 ### Nagle's Algorithm and TCP_NODELAY

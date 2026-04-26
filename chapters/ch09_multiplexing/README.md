@@ -237,7 +237,7 @@ On a clean network (data center, fiber), packet loss is rare (<0.01%) and HOL bl
 
 ---
 
-## Principal-Level Depth
+## Production Depth
 
 ### HTTP/3 and QUIC: Solving Head-of-Line Blocking
 
