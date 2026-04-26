@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch05 — WebSocket Chat Visual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --orange-glow: rgba(251, 146, 60, 0.2);
+    --red: #f87171;
+    --purple: #a78bfa;
+    --purple-glow: rgba(167, 139, 250, 0.3);
+    --cyan: #22d3ee;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  /* Controls */
+  .controls {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.5rem; flex-wrap: wrap; justify-content: center;
+  }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.5rem 1.2rem; border-radius: 6px; font-size: 0.9rem;
+    font-weight: 500; cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.danger { background: var(--red); }
+  .btn.danger:hover { background: #e85d5d; }
+  .btn.green { background: #22c55e; }
+  .btn.green:hover { background: #16a34a; }
+
+  /* Main layout */
+  .main-area {
+    width: 900px; max-width: 98vw;
+    display: flex; flex-direction: column; gap: 1.5rem;
+  }
+
+  /* Handshake display */
+  .handshake-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+    font-family: var(--font-mono); font-size: 0.72rem;
+    line-height: 1.7; display: none;
+  }
+  .handshake-panel.visible { display: block; }
+  .handshake-panel h3 {
+    font-family: var(--font-sans); font-size: 0.8rem;
+    color: var(--text-dim); margin-bottom: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .hs-request { color: var(--accent); }
+  .hs-response { color: var(--green); }
+  .hs-header-name { color: var(--orange); }
+  .hs-header-val { color: var(--text); }
+  .hs-step { color: var(--text-dim); font-style: italic; margin: 0.5rem 0; }
+
+  /* Connection diagram */
+  .diagram {
+    position: relative; height: 180px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+
+  .node {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 120px; text-align: center;
+  }
+  .node-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; margin: 0 auto 0.4rem;
+    border: 2px solid var(--border); background: var(--surface2);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .node-label { font-weight: 600; font-size: 0.85rem; }
+  .node-sublabel { color: var(--text-dim); font-size: 0.7rem; margin-top: 2px; }
+
+  .customer-node { left: 30px; }
+  .server-node { left: 50%; transform: translate(-50%, -50%); }
+  .driver-node { right: 30px; }
+
+  .customer-node .node-icon.active { border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow); }
+  .server-node .node-icon.active { border-color: var(--purple); box-shadow: 0 0 16px var(--purple-glow); }
+  .driver-node .node-icon.active { border-color: var(--green); box-shadow: 0 0 16px var(--green-glow); }
+
+  /* Connection lines */
+  .conn-line {
+    position: absolute; top: 50%; height: 2px;
+    background: var(--border); transform: translateY(-50%);
+    transition: background 0.5s, box-shadow 0.5s;
+  }
+  .conn-line.active {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+  .conn-line.dead {
+    background: var(--red);
+    box-shadow: none;
+    opacity: 0.4;
+  }
+  .conn-left { left: 155px; right: calc(50% + 55px); }
+  .conn-right { left: calc(50% + 55px); right: 155px; }
+
+  /* Flying messages */
+  .flying-msg {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    padding: 0.3rem 0.6rem; border-radius: 5px;
+    font-family: var(--font-mono); font-size: 0.65rem;
+    white-space: nowrap; opacity: 0; pointer-events: none; z-index: 10;
+    transition: left 0.6s ease-in-out, opacity 0.15s;
+  }
+  .flying-msg.customer-msg {
+    background: rgba(108, 140, 255, 0.15); border: 1px solid var(--accent); color: var(--accent);
+  }
+  .flying-msg.driver-msg {
+    background: rgba(74, 222, 128, 0.15); border: 1px solid var(--green); color: var(--green);
+  }
+  .flying-msg.ping-msg {
+    background: rgba(251, 146, 60, 0.15); border: 1px solid var(--orange); color: var(--orange);
+    font-size: 0.6rem; padding: 0.15rem 0.4rem;
+  }
+
+  /* Status indicator */
+  .conn-status {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-dim);
+  }
+  .conn-status .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 4px; vertical-align: middle;
+  }
+  .conn-status .dot.green { background: var(--green); }
+  .conn-status .dot.red { background: var(--red); }
+  .conn-status .dot.gray { background: var(--text-dim); }
+
+  /* Chat panels */
+  .chat-area {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  }
+  .chat-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; display: flex; flex-direction: column;
+    height: 280px;
+  }
+  .chat-panel-header {
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+    font-size: 0.8rem; font-weight: 600;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .chat-panel-header .role-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .customer-panel .role-dot { background: var(--accent); }
+  .driver-panel .role-dot { background: var(--green); }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 0.75rem;
+    font-size: 0.8rem; line-height: 1.5;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .chat-msg {
+    margin-bottom: 0.5rem; padding: 0.35rem 0.6rem;
+    border-radius: 6px; max-width: 85%; animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .chat-msg.sent { background: var(--surface2); margin-left: auto; }
+  .chat-msg.received { background: rgba(108, 140, 255, 0.08); }
+  .chat-msg.system { color: var(--text-dim); font-style: italic; font-size: 0.75rem; text-align: center; max-width: 100%; }
+  .chat-msg .sender { font-weight: 600; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 2px; }
+  .chat-msg .sender.customer-sender { color: var(--accent); }
+  .chat-msg .sender.driver-sender { color: var(--green); }
+
+  .chat-input-area {
+    display: flex; border-top: 1px solid var(--border);
+  }
+  .chat-input {
+    flex: 1; background: var(--surface2); border: none; color: var(--text);
+    padding: 0.6rem 0.75rem; font-size: 0.8rem; font-family: var(--font-sans);
+    outline: none;
+  }
+  .chat-input::placeholder { color: var(--text-dim); }
+  .chat-input:disabled { opacity: 0.3; }
+  .chat-send-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0 1rem; font-size: 0.8rem; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .chat-send-btn:hover { background: #5a7aef; }
+  .chat-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Frame inspector */
+  .frame-inspector {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+  }
+  .frame-inspector h3 {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .frame-display {
+    font-family: var(--font-mono); font-size: 0.72rem;
+    line-height: 1.8; min-height: 80px;
+  }
+  .frame-field { color: var(--cyan); }
+  .frame-value { color: var(--text); }
+  .frame-value.highlight { color: var(--orange); font-weight: 600; }
+
+  /* Bandwidth comparison */
+  .bandwidth-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+  }
+  .bandwidth-section h3 {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .bandwidth-bars { display: flex; flex-direction: column; gap: 0.5rem; }
+  .bw-row {
+    display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem;
+  }
+  .bw-label { width: 100px; text-align: right; color: var(--text-dim); font-size: 0.75rem; }
+  .bw-bar-track {
+    flex: 1; height: 24px; background: var(--surface2);
+    border-radius: 4px; overflow: hidden; position: relative;
+  }
+  .bw-bar-fill {
+    height: 100%; border-radius: 4px; display: flex;
+    align-items: center; padding-left: 8px;
+    font-family: var(--font-mono); font-size: 0.65rem; color: #fff;
+    transition: width 0.8s ease;
+  }
+  .bw-bar-fill.ws-bar { background: var(--green); }
+  .bw-bar-fill.http-bar { background: var(--red); opacity: 0.7; }
+
+  /* Insight */
+  .insight {
+    background: var(--surface); border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0; padding: 0.8rem 1rem;
+    font-size: 0.82rem; line-height: 1.6; color: var(--text-dim);
+  }
+  .insight strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Chapter 05 — WebSockets</h1>
+<p class="subtitle">Full-duplex driver-customer chat over a single persistent connection</p>
+
+<div class="main-area">
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn green" id="connectBtn">Connect Both</button>
+  <button class="btn danger" id="disconnectBtn" disabled>Disconnect</button>
+  <button class="btn" id="demoChatBtn" disabled>Demo Conversation</button>
+</div>
+
+<!-- Handshake animation -->
+<div class="handshake-panel" id="handshakePanel">
+  <h3>WebSocket Upgrade Handshake</h3>
+  <div id="handshakeContent"></div>
+</div>
+
+<!-- Connection diagram -->
+<div class="diagram" id="diagram">
+  <div class="conn-status" id="connStatus">
+    <span class="dot gray"></span> Not connected
+  </div>
+
+  <div class="node customer-node">
+    <div class="node-icon" id="customerIcon">&#128113;</div>
+    <div class="node-label">Customer</div>
+    <div class="node-sublabel">Alice</div>
+  </div>
+
+  <div class="conn-line conn-left" id="connLeft"></div>
+
+  <div class="node server-node">
+    <div class="node-icon" id="serverIcon">&#9881;&#65039;</div>
+    <div class="node-label">Server</div>
+    <div class="node-sublabel">Chat Room</div>
+  </div>
+
+  <div class="conn-line conn-right" id="connRight"></div>
+
+  <div class="node driver-node">
+    <div class="node-icon" id="driverIcon">&#128663;</div>
+    <div class="node-label">Driver</div>
+    <div class="node-sublabel">Bob</div>
+  </div>
+</div>
+
+<!-- Chat panels -->
+<div class="chat-area">
+  <div class="chat-panel customer-panel">
+    <div class="chat-panel-header">
+      <span class="role-dot"></span> Customer (Alice)
+    </div>
+    <div class="chat-messages" id="customerMessages"></div>
+    <div class="chat-input-area">
+      <input class="chat-input" id="customerInput" placeholder="Type a message..." disabled>
+      <button class="chat-send-btn" id="customerSendBtn" disabled>Send</button>
+    </div>
+  </div>
+  <div class="chat-panel driver-panel">
+    <div class="chat-panel-header">
+      <span class="role-dot"></span> Driver (Bob)
+    </div>
+    <div class="chat-messages" id="driverMessages"></div>
+    <div class="chat-input-area">
+      <input class="chat-input" id="driverInput" placeholder="Type a message..." disabled>
+      <button class="chat-send-btn" id="driverSendBtn" disabled>Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Frame inspector -->
+<div class="frame-inspector">
+  <h3>Last WebSocket Frame</h3>
+  <div class="frame-display" id="frameDisplay">
+    <span style="color: var(--text-dim)">Send a message to inspect its WebSocket frame...</span>
+  </div>
+</div>
+
+<!-- Bandwidth comparison -->
+<div class="bandwidth-section">
+  <h3>Cumulative Bandwidth: WebSocket vs HTTP</h3>
+  <div class="bandwidth-bars">
+    <div class="bw-row">
+      <div class="bw-label">WebSocket</div>
+      <div class="bw-bar-track">
+        <div class="bw-bar-fill ws-bar" id="wsBandwidthBar" style="width: 0%">0 B</div>
+      </div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label">HTTP equiv.</div>
+      <div class="bw-bar-track">
+        <div class="bw-bar-fill http-bar" id="httpBandwidthBar" style="width: 0%">0 B</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Insight -->
+<div class="insight">
+  <strong>Key insight:</strong> After the one-time upgrade handshake (~350 bytes), every chat message
+  costs just 2-20 bytes of framing overhead. The equivalent HTTP POST would carry ~400 bytes of
+  headers per message. For a 50-message chat session, WebSocket uses ~1,400 bytes total vs HTTP's
+  ~35,000 bytes — a 96% reduction in overhead. The connection is full-duplex: both sides send
+  independently, simultaneously, over a single TCP connection.
+</div>
+
+</div><!-- /main-area -->
+
+<script>
+(function() {
+  // --- Elements ---
+  const connectBtn = document.getElementById('connectBtn');
+  const disconnectBtn = document.getElementById('disconnectBtn');
+  const demoChatBtn = document.getElementById('demoChatBtn');
+  const handshakePanel = document.getElementById('handshakePanel');
+  const handshakeContent = document.getElementById('handshakeContent');
+  const connStatus = document.getElementById('connStatus');
+  const customerIcon = document.getElementById('customerIcon');
+  const serverIcon = document.getElementById('serverIcon');
+  const driverIcon = document.getElementById('driverIcon');
+  const connLeft = document.getElementById('connLeft');
+  const connRight = document.getElementById('connRight');
+  const customerMessages = document.getElementById('customerMessages');
+  const driverMessages = document.getElementById('driverMessages');
+  const customerInput = document.getElementById('customerInput');
+  const driverInput = document.getElementById('driverInput');
+  const customerSendBtn = document.getElementById('customerSendBtn');
+  const driverSendBtn = document.getElementById('driverSendBtn');
+  const frameDisplay = document.getElementById('frameDisplay');
+  const wsBandwidthBar = document.getElementById('wsBandwidthBar');
+  const httpBandwidthBar = document.getElementById('httpBandwidthBar');
+  const diagram = document.getElementById('diagram');
+
+  let connected = false;
+  let animating = false;
+  let messageCount = 0;
+  let wsTotalBytes = 0;
+  let httpTotalBytes = 0;
+  let pingInterval = null;
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // --- Handshake Animation ---
+  async function showHandshake(side) {
+    handshakePanel.classList.add('visible');
+    handshakeContent.innerHTML = '';
+
+    const lines = [
+      { cls: 'hs-step', text: `--- ${side === 'customer' ? 'Customer (Alice)' : 'Driver (Bob)'} initiates WebSocket upgrade ---` },
+      { cls: 'hs-request', text: `GET /ws/chat/order_abc123?role=${side === 'customer' ? 'customer' : 'driver'}&name=${side === 'customer' ? 'Alice' : 'Bob'} HTTP/1.1` },
+      { cls: '', text: `<span class="hs-header-name">Host</span>: <span class="hs-header-val">localhost:8005</span>` },
+      { cls: '', text: `<span class="hs-header-name">Connection</span>: <span class="hs-header-val">Upgrade</span>` },
+      { cls: '', text: `<span class="hs-header-name">Upgrade</span>: <span class="hs-header-val">websocket</span>` },
+      { cls: '', text: `<span class="hs-header-name">Sec-WebSocket-Version</span>: <span class="hs-header-val">13</span>` },
+      { cls: '', text: `<span class="hs-header-name">Sec-WebSocket-Key</span>: <span class="hs-header-val">dGhlIHNhbXBsZSBub25jZQ==</span>` },
+      { cls: 'hs-step', text: '--- Server accepts the upgrade ---' },
+      { cls: 'hs-response', text: 'HTTP/1.1 101 Switching Protocols' },
+      { cls: '', text: `<span class="hs-header-name">Upgrade</span>: <span class="hs-header-val">websocket</span>` },
+      { cls: '', text: `<span class="hs-header-name">Connection</span>: <span class="hs-header-val">Upgrade</span>` },
+      { cls: '', text: `<span class="hs-header-name">Sec-WebSocket-Accept</span>: <span class="hs-header-val">s3pPLMBiTxaQ9kYGzzhZRbK+xOo=</span>` },
+      { cls: 'hs-step', text: '=== HTTP is gone. Connection is now WebSocket. ===' },
+    ];
+
+    for (const line of lines) {
+      const div = document.createElement('div');
+      if (line.cls) div.className = line.cls;
+      div.innerHTML = line.text;
+      handshakeContent.appendChild(div);
+      await sleep(80);
+    }
+    await sleep(300);
+  }
+
+  // --- Frame Display ---
+  function showFrame(sender, content, direction) {
+    const payloadBytes = new TextEncoder().encode(content).length;
+    const isMasked = direction === 'client-to-server';
+    const headerBytes = payloadBytes <= 125 ? 2 : (payloadBytes <= 65535 ? 4 : 10);
+    const maskBytes = isMasked ? 4 : 0;
+    const totalFrame = headerBytes + maskBytes + payloadBytes;
+    const httpEquiv = 400 + payloadBytes;
+
+    frameDisplay.innerHTML =
+      `<span class="frame-field">Direction:</span> <span class="frame-value">${direction}</span>\n` +
+      `<span class="frame-field">FIN:</span> <span class="frame-value">1</span>  ` +
+      `<span class="frame-field">RSV1:</span> <span class="frame-value">0</span>  ` +
+      `<span class="frame-field">RSV2:</span> <span class="frame-value">0</span>  ` +
+      `<span class="frame-field">RSV3:</span> <span class="frame-value">0</span>\n` +
+      `<span class="frame-field">Opcode:</span> <span class="frame-value highlight">0x1 (text)</span>\n` +
+      `<span class="frame-field">MASK:</span> <span class="frame-value">${isMasked ? '1 (client frames are always masked)' : '0 (server frames are never masked)'}</span>\n` +
+      `<span class="frame-field">Payload length:</span> <span class="frame-value">${payloadBytes} bytes</span>\n` +
+      `<span class="frame-field">Frame overhead:</span> <span class="frame-value">${headerBytes + maskBytes} bytes</span>  ` +
+      `<span class="frame-field">Total:</span> <span class="frame-value highlight">${totalFrame} bytes</span>\n` +
+      `<span class="frame-field">HTTP equivalent:</span> <span class="frame-value">${httpEquiv} bytes</span>  ` +
+      `<span class="frame-field">Savings:</span> <span class="frame-value highlight">${Math.round((1 - totalFrame/httpEquiv)*100)}%</span>\n` +
+      `<span class="frame-field">Payload:</span> <span class="frame-value">"${content}"</span>`;
+  }
+
+  // --- Bandwidth tracking ---
+  function updateBandwidth(payloadBytes) {
+    const wsFrameBytes = (payloadBytes <= 125 ? 6 : 8) + payloadBytes; // masked client + unmasked server relay
+    const httpBytes = 400 + payloadBytes; // headers + payload
+
+    wsTotalBytes += wsFrameBytes * 2; // sent + relayed
+    httpTotalBytes += httpBytes * 2;   // request + response
+
+    const maxBytes = Math.max(httpTotalBytes, 1);
+    const wsPercent = Math.min((wsTotalBytes / maxBytes) * 100, 100);
+    const httpPercent = 100;
+
+    wsBandwidthBar.style.width = wsPercent + '%';
+    wsBandwidthBar.textContent = formatBytes(wsTotalBytes);
+    httpBandwidthBar.style.width = httpPercent + '%';
+    httpBandwidthBar.textContent = formatBytes(httpTotalBytes);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    return (bytes / 1024).toFixed(1) + ' KB';
+  }
+
+  // --- Add message to chat panel ---
+  function addMessage(panel, sender, content, type, fromSelf) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + (type === 'system' ? 'system' : (fromSelf ? 'sent' : 'received'));
+    if (type !== 'system') {
+      const senderDiv = document.createElement('div');
+      senderDiv.className = 'sender ' + (sender === 'Alice' ? 'customer-sender' : 'driver-sender');
+      senderDiv.textContent = sender;
+      div.appendChild(senderDiv);
+    }
+    const textDiv = document.createElement('div');
+    textDiv.textContent = content;
+    div.appendChild(textDiv);
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  // --- Animate flying message ---
+  async function flyMessage(from, to, content, cls) {
+    const msg = document.createElement('div');
+    msg.className = 'flying-msg ' + cls;
+    msg.textContent = content.length > 25 ? content.substring(0, 22) + '...' : content;
+    diagram.appendChild(msg);
+
+    const diagramW = diagram.offsetWidth;
+    // Calculate positions based on node positions
+    const positions = {
+      customer: diagramW * 0.1 + 60,
+      server: diagramW * 0.5,
+      driver: diagramW * 0.9 - 60,
+    };
+
+    const fromX = positions[from];
+    const toX = positions[to];
+
+    msg.style.left = fromX + 'px';
+    msg.style.opacity = '1';
+
+    await sleep(50);
+    msg.style.left = toX + 'px';
+    await sleep(600);
+    msg.style.opacity = '0';
+    await sleep(200);
+    diagram.removeChild(msg);
+  }
+
+  // --- Send a chat message (simulated) ---
+  async function sendMessage(sender, content) {
+    if (!connected) return;
+    messageCount++;
+
+    const isCustomer = sender === 'customer';
+    const senderName = isCustomer ? 'Alice' : 'Bob';
+    const senderPanel = isCustomer ? customerMessages : driverMessages;
+    const receiverPanel = isCustomer ? driverMessages : customerMessages;
+
+    // Show in sender's panel as "sent"
+    addMessage(senderPanel, senderName, content, 'chat', true);
+
+    // Show frame details
+    showFrame(senderName, content, 'client-to-server');
+
+    // Animate: sender → server
+    const msgCls = isCustomer ? 'customer-msg' : 'driver-msg';
+    const fromNode = isCustomer ? 'customer' : 'driver';
+    const toNode = isCustomer ? 'driver' : 'customer';
+
+    // Highlight nodes
+    const senderIcon = isCustomer ? customerIcon : driverIcon;
+    senderIcon.classList.add('active');
+    serverIcon.classList.add('active');
+
+    await flyMessage(fromNode, 'server', content, msgCls);
+
+    // Server relays to other client
+    await flyMessage('server', toNode, content, msgCls);
+
+    senderIcon.classList.remove('active');
+    serverIcon.classList.remove('active');
+
+    // Show in receiver's panel as "received"
+    addMessage(receiverPanel, senderName, content, 'chat', false);
+
+    // Update bandwidth
+    const payloadBytes = new TextEncoder().encode(content).length;
+    updateBandwidth(payloadBytes);
+  }
+
+  // --- Ping/Pong visual ---
+  async function showPingPong() {
+    if (!connected) return;
+    // Ping from server to customer
+    const ping = document.createElement('div');
+    ping.className = 'flying-msg ping-msg';
+    ping.textContent = 'PING';
+    diagram.appendChild(ping);
+
+    const diagramW = diagram.offsetWidth;
+    const serverX = diagramW * 0.5;
+    const customerX = diagramW * 0.1 + 60;
+
+    ping.style.left = serverX + 'px';
+    ping.style.opacity = '1';
+    await sleep(50);
+    ping.style.left = customerX + 'px';
+    await sleep(500);
+    ping.textContent = 'PONG';
+    await sleep(100);
+    ping.style.left = serverX + 'px';
+    await sleep(500);
+    ping.style.opacity = '0';
+    await sleep(150);
+    if (ping.parentNode) diagram.removeChild(ping);
+  }
+
+  // --- Connect ---
+  async function connect() {
+    if (connected || animating) return;
+    animating = true;
+    connectBtn.disabled = true;
+
+    // Reset state
+    messageCount = 0;
+    wsTotalBytes = 350; // handshake cost
+    httpTotalBytes = 0;
+    customerMessages.innerHTML = '';
+    driverMessages.innerHTML = '';
+    wsBandwidthBar.style.width = '0%';
+    wsBandwidthBar.textContent = '0 B';
+    httpBandwidthBar.style.width = '0%';
+    httpBandwidthBar.textContent = '0 B';
+
+    // Show handshake for customer
+    await showHandshake('customer');
+    connLeft.classList.add('active');
+    customerIcon.classList.add('active');
+    await sleep(200);
+    customerIcon.classList.remove('active');
+
+    // Show handshake for driver
+    await showHandshake('driver');
+    connRight.classList.add('active');
+    driverIcon.classList.add('active');
+    await sleep(200);
+    driverIcon.classList.remove('active');
+
+    // Update status
+    connStatus.innerHTML = '<span class="dot green"></span> Connected (full-duplex)';
+    connected = true;
+
+    // Enable inputs
+    customerInput.disabled = false;
+    driverInput.disabled = false;
+    customerSendBtn.disabled = false;
+    driverSendBtn.disabled = false;
+    disconnectBtn.disabled = false;
+    demoChatBtn.disabled = false;
+
+    // System messages
+    addMessage(customerMessages, '', 'Connected to chat room for order_abc123', 'system');
+    addMessage(driverMessages, '', 'Connected to chat room for order_abc123', 'system');
+    addMessage(customerMessages, '', 'Bob (driver) is in the chat', 'system');
+    addMessage(driverMessages, '', 'Alice (customer) is in the chat', 'system');
+
+    // Update bandwidth for handshake
+    wsBandwidthBar.style.width = '2%';
+    wsBandwidthBar.textContent = formatBytes(wsTotalBytes);
+
+    // Start periodic ping/pong
+    pingInterval = setInterval(() => showPingPong(), 8000);
+
+    animating = false;
+    await sleep(300);
+    handshakePanel.classList.remove('visible');
+  }
+
+  // --- Disconnect ---
+  async function disconnect() {
+    if (!connected || animating) return;
+    animating = true;
+
+    connected = false;
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+
+    // Show close handshake
+    handshakePanel.classList.add('visible');
+    handshakeContent.innerHTML = '';
+
+    const closeLines = [
+      { cls: 'hs-step', text: '--- Customer initiates close handshake ---' },
+      { cls: 'hs-request', text: 'Close Frame: [opcode=0x8, code=1000, reason="Chat ended"]' },
+      { cls: 'hs-step', text: '--- Server acknowledges close ---' },
+      { cls: 'hs-response', text: 'Close Frame: [opcode=0x8, code=1000, reason="Chat ended"]' },
+      { cls: 'hs-step', text: '=== TCP connection closed. WebSocket session ended. ===' },
+    ];
+
+    for (const line of closeLines) {
+      const div = document.createElement('div');
+      if (line.cls) div.className = line.cls;
+      div.innerHTML = line.text;
+      handshakeContent.appendChild(div);
+      await sleep(150);
+    }
+
+    connLeft.classList.remove('active');
+    connLeft.classList.add('dead');
+    connRight.classList.remove('active');
+    connRight.classList.add('dead');
+    connStatus.innerHTML = '<span class="dot red"></span> Disconnected';
+
+    addMessage(customerMessages, '', 'Connection closed (1000: Chat ended)', 'system');
+    addMessage(driverMessages, '', 'Connection closed (1000: Chat ended)', 'system');
+
+    customerInput.disabled = true;
+    driverInput.disabled = true;
+    customerSendBtn.disabled = true;
+    driverSendBtn.disabled = true;
+    disconnectBtn.disabled = true;
+    demoChatBtn.disabled = true;
+    connectBtn.disabled = false;
+
+    await sleep(1500);
+    handshakePanel.classList.remove('visible');
+    connLeft.classList.remove('dead');
+    connRight.classList.remove('dead');
+    connStatus.innerHTML = '<span class="dot gray"></span> Not connected';
+
+    animating = false;
+  }
+
+  // --- Demo Conversation ---
+  async function demoConversation() {
+    if (!connected || animating) return;
+    animating = true;
+    demoChatBtn.disabled = true;
+    customerInput.disabled = true;
+    driverInput.disabled = true;
+    customerSendBtn.disabled = true;
+    driverSendBtn.disabled = true;
+
+    const conversation = [
+      { sender: 'driver', content: "Hi! I'm nearby with your order." },
+      { sender: 'customer', content: "Great! I'm at 123 Main St." },
+      { sender: 'driver', content: "I see the building. Which entrance?" },
+      { sender: 'customer', content: "Side door with the blue awning." },
+      { sender: 'driver', content: "Found it! Coming up now." },
+      { sender: 'customer', content: "Perfect, I'll buzz you in." },
+      { sender: 'driver', content: "I'm at your door!" },
+      { sender: 'customer', content: "Got it, thanks! Enjoy your evening." },
+    ];
+
+    for (const msg of conversation) {
+      await sendMessage(msg.sender, msg.content);
+      await sleep(800);
+    }
+
+    customerInput.disabled = false;
+    driverInput.disabled = false;
+    customerSendBtn.disabled = false;
+    driverSendBtn.disabled = false;
+    demoChatBtn.disabled = false;
+    animating = false;
+  }
+
+  // --- Input handling ---
+  function handleCustomerSend() {
+    const content = customerInput.value.trim();
+    if (!content || !connected) return;
+    customerInput.value = '';
+    sendMessage('customer', content);
+  }
+
+  function handleDriverSend() {
+    const content = driverInput.value.trim();
+    if (!content || !connected) return;
+    driverInput.value = '';
+    sendMessage('driver', content);
+  }
+
+  customerSendBtn.addEventListener('click', handleCustomerSend);
+  driverSendBtn.addEventListener('click', handleDriverSend);
+  customerInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleCustomerSend(); });
+  driverInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleDriverSend(); });
+
+  connectBtn.addEventListener('click', connect);
+  disconnectBtn.addEventListener('click', disconnect);
+  demoChatBtn.addEventListener('click', demoConversation);
+})();
+</script>
+</body>
+</html>

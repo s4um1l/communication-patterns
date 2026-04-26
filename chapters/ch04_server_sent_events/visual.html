@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch04 — SSE Visual: Persistent Stream vs Long Polling</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.3);
+    --green: #4ade80;
+    --green-glow: rgba(74, 222, 128, 0.3);
+    --orange: #fb923c;
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.15);
+    --green-dim: rgba(74, 222, 128, 0.15);
+    --yellow: #fbbf24;
+    --purple: #a78bfa;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+  }
+
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { background: #5a7aef; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.green { background: var(--green); color: #000; }
+  .btn.green:hover { background: #3bcc6e; box-shadow: 0 0 16px var(--green-glow); }
+  .btn.orange { background: var(--orange); color: #000; }
+  .btn.orange:hover { background: #e8842e; }
+
+  .status-display {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .status-display .label { color: var(--text-dim); }
+  .status-display .value { color: var(--yellow); font-weight: 600; }
+
+  /* Main layout */
+  .main-split {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+    width: 1100px;
+    max-width: 95vw;
+    margin-bottom: 1.5rem;
+  }
+
+  /* SSE visualization (main panel) */
+  .sse-panel {
+    background: var(--surface);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title { font-weight: 600; font-size: 0.95rem; }
+
+  .panel-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+  }
+  .badge-sse { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+  .badge-lp { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+
+  .conn-area {
+    height: 260px;
+    position: relative;
+    background: var(--surface2);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+
+  .conn-area canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .conn-state-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    z-index: 2;
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+
+  .conn-state-indicator.disconnected {
+    background: rgba(248, 113, 113, 0.15);
+    color: var(--red);
+    border: 1px solid var(--red);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.orange { color: var(--orange); }
+  .stat-value.yellow { color: var(--yellow); }
+
+  /* Right side: Long Polling comparison inset + event format + bandwidth */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .lp-inset {
+    background: var(--surface);
+    border: 1px solid var(--red);
+    border-radius: 10px;
+    padding: 0.8rem;
+  }
+
+  .lp-area {
+    height: 120px;
+    position: relative;
+    background: var(--surface2);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+
+  .lp-area canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .lp-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+  }
+
+  .lp-stats .stat-box { padding: 0.3rem 0.5rem; }
+  .lp-stats .stat-value { font-size: 1rem; }
+
+  /* Event format display */
+  .event-format-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem;
+  }
+
+  .event-format-box h3 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .event-format {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.5;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .ef-event { color: var(--purple); }
+  .ef-id { color: var(--yellow); }
+  .ef-data { color: var(--green); }
+  .ef-comment { color: var(--text-dim); font-style: italic; }
+
+  /* Bandwidth comparison */
+  .bandwidth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem;
+  }
+
+  .bandwidth-box h3 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .bandwidth-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .bw-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+  }
+
+  .bw-label {
+    width: 30px;
+    color: var(--text-dim);
+  }
+
+  .bw-bar-bg {
+    flex: 1;
+    height: 16px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bw-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+    min-width: 2px;
+  }
+
+  .bw-bar.sse { background: var(--green); }
+  .bw-bar.lp { background: var(--red); }
+
+  .bw-value {
+    width: 60px;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .bw-value.green { color: var(--green); }
+  .bw-value.red { color: var(--red); }
+
+  /* Insight */
+  .insight {
+    width: 1100px;
+    max-width: 95vw;
+    background: var(--surface);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0;
+    padding: 0.8rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .insight strong { color: var(--text); }
+
+  /* Event log */
+  .event-log {
+    width: 1100px;
+    max-width: 95vw;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-top: 1rem;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.6;
+  }
+  .log-entry { padding: 0.1rem 0; }
+  .log-sse { color: var(--green); }
+  .log-lp { color: var(--red); }
+  .log-system { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Chapter 04 -- Server-Sent Events vs Long Polling</h1>
+<p class="subtitle">One persistent connection streams all events. Compare the efficiency in real time.</p>
+
+<div class="controls">
+  <button class="btn green" id="startBtn">Start Demo</button>
+  <button class="btn orange" id="sendEventBtn" disabled>Send Event</button>
+  <button class="btn orange" id="burstBtn" disabled>Burst (5 events)</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <div class="status-display">
+    <span class="label">Events Sent: </span>
+    <span class="value" id="totalEvents">0</span>
+  </div>
+</div>
+
+<div class="main-split">
+  <!-- LEFT: SSE main visualization -->
+  <div class="sse-panel">
+    <div class="panel-header">
+      <span class="panel-title">Server-Sent Events (SSE)</span>
+      <span class="panel-badge badge-sse">Persistent Stream</span>
+    </div>
+    <div class="conn-area" id="sseArea">
+      <canvas id="sseCanvas"></canvas>
+      <div class="conn-state-indicator" id="sseState">DISCONNECTED</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-value green" id="sseEvents">0</div>
+        <div class="stat-label">Events Received</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value accent" id="sseRequests">0</div>
+        <div class="stat-label">HTTP Requests</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value yellow" id="sseHeartbeats">0</div>
+        <div class="stat-label">Heartbeats</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Comparison + event format + bandwidth -->
+  <div class="side-panel">
+    <!-- Long Polling inset comparison -->
+    <div class="lp-inset">
+      <div class="panel-header" style="margin-bottom: 0.5rem; padding-bottom: 0.3rem;">
+        <span class="panel-title" style="font-size: 0.85rem;">Long Polling (for comparison)</span>
+        <span class="panel-badge badge-lp">Reconnects per event</span>
+      </div>
+      <div class="lp-area" id="lpArea">
+        <canvas id="lpCanvas"></canvas>
+      </div>
+      <div class="lp-stats">
+        <div class="stat-box">
+          <div class="stat-value red" id="lpRequests">0</div>
+          <div class="stat-label">Requests</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value red" id="lpEvents">0</div>
+          <div class="stat-label">Events</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event format display -->
+    <div class="event-format-box">
+      <h3>Last SSE Event (raw bytes on wire)</h3>
+      <div class="event-format" id="eventFormat">
+        <span class="ef-comment">: waiting for events...</span>
+      </div>
+    </div>
+
+    <!-- Bandwidth comparison -->
+    <div class="bandwidth-box">
+      <h3>Cumulative Bandwidth</h3>
+      <div class="bandwidth-bars">
+        <div class="bw-row">
+          <span class="bw-label">SSE</span>
+          <div class="bw-bar-bg"><div class="bw-bar sse" id="bwBarSse" style="width: 0%"></div></div>
+          <span class="bw-value green" id="bwValSse">0 B</span>
+        </div>
+        <div class="bw-row">
+          <span class="bw-label">LP</span>
+          <div class="bw-bar-bg"><div class="bw-bar lp" id="bwBarLp" style="width: 0%"></div></div>
+          <span class="bw-value red" id="bwValLp">0 B</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>What to watch for:</strong> SSE (left) maintains a single persistent connection line. Events flow down it as colored blobs --
+  no reconnection between events. Long polling (right inset) must reconnect after every single event, adding ~900 bytes of HTTP
+  overhead each time. During a burst of events, SSE delivers them back-to-back instantly; long polling queues them behind reconnection delays.
+  Watch the bandwidth counter -- the gap grows with every event.
+</div>
+
+<div class="event-log" id="eventLog"></div>
+
+<script>
+(function() {
+  // ---- State ----
+  let running = false;
+  let startTime = 0;
+  let totalEvents = 0;
+
+  // SSE state
+  let sseConnected = false;
+  let sseEvents = 0;
+  let sseRequests = 0;  // Should be 1 (initial connection)
+  let sseHeartbeats = 0;
+  let sseDrawEvents = [];  // {time, type: 'connect'|'event'|'heartbeat', eventNum}
+  let sseBandwidth = 0;  // Estimated bytes
+
+  // Long Polling state
+  let lpEvents = 0;
+  let lpRequests = 0;
+  let lpDrawEvents = [];  // {time, type: 'request'|'response'|'reconnect', changed}
+  let lpBandwidth = 0;
+  let lpWaiting = false;
+  let lpWaitStart = 0;
+  let lpPendingEvents = [];  // Events queued while LP is reconnecting
+  let lpReconnectTimer = null;
+
+  // Event colors
+  const EVENT_COLORS = [
+    '#4ade80', '#6c8cff', '#a78bfa', '#fb923c',
+    '#fbbf24', '#f87171', '#38bdf8', '#e879f9',
+  ];
+
+  // ---- Elements ----
+  const startBtn = document.getElementById('startBtn');
+  const sendEventBtn = document.getElementById('sendEventBtn');
+  const burstBtn = document.getElementById('burstBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const totalEventsEl = document.getElementById('totalEvents');
+  const sseEventsEl = document.getElementById('sseEvents');
+  const sseRequestsEl = document.getElementById('sseRequests');
+  const sseHeartbeatsEl = document.getElementById('sseHeartbeats');
+  const sseStateEl = document.getElementById('sseState');
+  const lpRequestsEl = document.getElementById('lpRequests');
+  const lpEventsEl = document.getElementById('lpEvents');
+  const eventFormatEl = document.getElementById('eventFormat');
+  const bwBarSse = document.getElementById('bwBarSse');
+  const bwBarLp = document.getElementById('bwBarLp');
+  const bwValSse = document.getElementById('bwValSse');
+  const bwValLp = document.getElementById('bwValLp');
+  const eventLogEl = document.getElementById('eventLog');
+
+  const sseCanvas = document.getElementById('sseCanvas');
+  const lpCanvas = document.getElementById('lpCanvas');
+
+  // ---- Canvas setup ----
+  function setupCanvas(canvas) {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+    return ctx;
+  }
+
+  let sseCtx, lpCtx;
+  function initCanvases() {
+    sseCtx = setupCanvas(sseCanvas);
+    lpCtx = setupCanvas(lpCanvas);
+  }
+  initCanvases();
+  window.addEventListener('resize', initCanvases);
+
+  // ---- Helpers ----
+  function elapsed() { return (Date.now() - startTime) / 1000; }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function log(cls, msg) {
+    const el = document.createElement('div');
+    el.className = 'log-entry ' + cls;
+    const t = running ? elapsed().toFixed(1) : '0.0';
+    el.textContent = `[${t}s] ${msg}`;
+    eventLogEl.prepend(el);
+    if (eventLogEl.children.length > 80) eventLogEl.lastChild.remove();
+  }
+
+  function updateBandwidth() {
+    const maxBw = Math.max(sseBandwidth, lpBandwidth, 1);
+    bwBarSse.style.width = (sseBandwidth / maxBw * 100) + '%';
+    bwBarLp.style.width = (lpBandwidth / maxBw * 100) + '%';
+    bwValSse.textContent = formatBytes(sseBandwidth);
+    bwValLp.textContent = formatBytes(lpBandwidth);
+  }
+
+  // ---- SSE Drawing ----
+  const CANVAS_DURATION = 25;
+  const CLIENT_Y_SSE = 40;
+  const SERVER_Y_SSE = 210;
+
+  function timeToX(ctx, t, now, duration) {
+    const w = ctx.canvas.width / 2;
+    const margin = 10;
+    const usable = w - margin * 2;
+    const offset = now - duration;
+    return margin + ((t - offset) / duration) * usable;
+  }
+
+  function drawSSE(ctx) {
+    const w = ctx.canvas.width / 2;
+    const h = ctx.canvas.height / 2;
+    ctx.clearRect(0, 0, w, h);
+    const now = elapsed();
+
+    // Labels
+    ctx.font = '10px monospace';
+    ctx.fillStyle = 'rgba(139, 143, 163, 0.7)';
+    ctx.textAlign = 'left';
+    ctx.fillText('CLIENT', 4, CLIENT_Y_SSE - 12);
+    ctx.fillText('SERVER', 4, SERVER_Y_SSE + 18);
+
+    // Draw persistent connection line
+    if (sseConnected) {
+      // Find connection start time
+      const connEvt = sseDrawEvents.find(e => e.type === 'connect');
+      const connStartX = connEvt ? timeToX(ctx, connEvt.time, now, CANVAS_DURATION) : 10;
+      const nowX = timeToX(ctx, now, now, CANVAS_DURATION);
+
+      // Persistent connection line (vertical center)
+      const midY = (CLIENT_Y_SSE + SERVER_Y_SSE) / 2;
+
+      // Draw the persistent pipe
+      ctx.strokeStyle = 'rgba(74, 222, 128, 0.2)';
+      ctx.lineWidth = 20;
+      ctx.beginPath();
+      ctx.moveTo(Math.max(connStartX, 10), midY);
+      ctx.lineTo(nowX, midY);
+      ctx.stroke();
+
+      // Pipe border lines
+      ctx.strokeStyle = 'rgba(74, 222, 128, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(Math.max(connStartX, 10), midY - 10);
+      ctx.lineTo(nowX, midY - 10);
+      ctx.moveTo(Math.max(connStartX, 10), midY + 10);
+      ctx.lineTo(nowX, midY + 10);
+      ctx.stroke();
+
+      // "STREAM OPEN" label
+      ctx.fillStyle = 'rgba(74, 222, 128, 0.4)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      const labelX = Math.max((connStartX + nowX) / 2, 50);
+      ctx.fillText('PERSISTENT CONNECTION', labelX, midY - 16);
+
+      // Initial request arrow
+      if (connEvt && connStartX > 5) {
+        ctx.strokeStyle = 'rgba(108, 140, 255, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(connStartX, CLIENT_Y_SSE);
+        ctx.lineTo(connStartX, SERVER_Y_SSE);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(108, 140, 255, 0.6)';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('GET /stream', connStartX + 3, CLIENT_Y_SSE + 14);
+      }
+    }
+
+    // Draw events flowing down the connection
+    for (const ev of sseDrawEvents) {
+      const x = timeToX(ctx, ev.time, now, CANVAS_DURATION);
+      if (x < 5 || x > w + 10) continue;
+
+      if (ev.type === 'event') {
+        const midY = (CLIENT_Y_SSE + SERVER_Y_SSE) / 2;
+        const color = EVENT_COLORS[ev.eventNum % EVENT_COLORS.length];
+
+        // Event blob moving from server to client
+        const age = now - ev.time;
+        const travelDuration = 0.5;
+
+        if (age < travelDuration) {
+          // Animating: blob moves from server toward client along the pipe
+          const progress = age / travelDuration;
+          const blobY = SERVER_Y_SSE - (SERVER_Y_SSE - CLIENT_Y_SSE) * progress;
+
+          ctx.beginPath();
+          ctx.arc(x, blobY, 6, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Glow
+          ctx.beginPath();
+          ctx.arc(x, blobY, 10, 0, Math.PI * 2);
+          ctx.fillStyle = color.replace(')', ', 0.15)').replace('rgb', 'rgba');
+          ctx.fill();
+        } else {
+          // Arrived: show at client level
+          ctx.beginPath();
+          ctx.arc(x, CLIENT_Y_SSE + 4, 4, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.globalAlpha = Math.max(0.3, 1 - (age - travelDuration) / 8);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        // Event number label
+        if (age < 4) {
+          ctx.fillStyle = color;
+          ctx.font = '8px monospace';
+          ctx.textAlign = 'center';
+          ctx.globalAlpha = Math.max(0, 1 - age / 4);
+          ctx.fillText('#' + ev.eventNum, x, SERVER_Y_SSE + 14);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      if (ev.type === 'heartbeat') {
+        // Small tick mark
+        const midY = (CLIENT_Y_SSE + SERVER_Y_SSE) / 2;
+        ctx.strokeStyle = 'rgba(139, 143, 163, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(x, midY - 6);
+        ctx.lineTo(x, midY + 6);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ---- Long Polling Drawing ----
+  const CLIENT_Y_LP = 20;
+  const SERVER_Y_LP = 85;
+  const LP_DURATION = 25;
+
+  function drawLP(ctx) {
+    const w = ctx.canvas.width / 2;
+    const h = ctx.canvas.height / 2;
+    ctx.clearRect(0, 0, w, h);
+    const now = elapsed();
+
+    // Labels
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(139, 143, 163, 0.6)';
+    ctx.textAlign = 'left';
+    ctx.fillText('CLI', 2, CLIENT_Y_LP - 4);
+    ctx.fillText('SRV', 2, SERVER_Y_LP + 12);
+
+    for (const ev of lpDrawEvents) {
+      const x = timeToX(ctx, ev.time, now, LP_DURATION);
+      if (x < 2 || x > w + 5) continue;
+
+      if (ev.type === 'request') {
+        ctx.strokeStyle = 'rgba(108, 140, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, CLIENT_Y_LP);
+        ctx.lineTo(x, SERVER_Y_LP);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(108, 140, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(x, SERVER_Y_LP);
+        ctx.lineTo(x - 3, SERVER_Y_LP - 5);
+        ctx.lineTo(x + 3, SERVER_Y_LP - 5);
+        ctx.fill();
+      }
+
+      if (ev.type === 'response') {
+        const color = ev.changed ? 'rgba(74, 222, 128, 0.8)' : 'rgba(248, 113, 113, 0.4)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = ev.changed ? 2 : 1;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, SERVER_Y_LP);
+        ctx.lineTo(x, CLIENT_Y_LP);
+        ctx.stroke();
+
+        if (ev.changed) {
+          ctx.beginPath();
+          ctx.arc(x, CLIENT_Y_LP, 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      if (ev.type === 'hold') {
+        const endX = ev.endTime ? timeToX(ctx, ev.endTime, now, LP_DURATION) : timeToX(ctx, now, now, LP_DURATION);
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, (CLIENT_Y_LP + SERVER_Y_LP) / 2);
+        ctx.lineTo(Math.min(endX, timeToX(ctx, now, now, LP_DURATION)), (CLIENT_Y_LP + SERVER_Y_LP) / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ---- Animation ----
+  let animFrame;
+  function render() {
+    if (!running) return;
+    drawSSE(sseCtx);
+    drawLP(lpCtx);
+    animFrame = requestAnimationFrame(render);
+  }
+
+  // ---- Event dispatch ----
+  let eventIdCounter = 0;
+
+  function dispatchEvent() {
+    if (!running) return;
+    totalEvents++;
+    eventIdCounter++;
+    totalEventsEl.textContent = totalEvents;
+
+    const eventNum = eventIdCounter;
+    const eventData = {
+      order_id: 'ord_' + String(eventNum).padStart(3, '0'),
+      customer: ['Alice', 'Bob', 'Carol', 'Dave', 'Eve'][eventNum % 5],
+      type: eventNum % 3 === 0 ? 'status_changed' : 'order_placed',
+    };
+    const eventType = eventData.type;
+    const dataJson = JSON.stringify(eventData);
+
+    // --- SSE handling: instant delivery ---
+    sseEvents++;
+    sseEventsEl.textContent = sseEvents;
+
+    // SSE bandwidth: just the event bytes (no HTTP overhead)
+    const eventBytes = `event: ${eventType}\nid: ${eventNum}\ndata: ${dataJson}\n\n`.length;
+    sseBandwidth += eventBytes;
+
+    sseDrawEvents.push({ time: elapsed(), type: 'event', eventNum });
+
+    // Update event format display
+    eventFormatEl.innerHTML =
+      `<span class="ef-event">event: ${eventType}</span>\n` +
+      `<span class="ef-id">id: ${eventNum}</span>\n` +
+      `<span class="ef-data">data: ${dataJson}</span>\n`;
+
+    log('log-sse', `SSE: Event #${eventNum} (${eventType}) delivered instantly`);
+
+    // --- Long Polling handling: queue or deliver ---
+    if (lpWaiting) {
+      // LP is currently holding a request — deliver and force reconnect
+      const holdEvt = lpDrawEvents.find(e => e.type === 'hold' && !e.endTime);
+      if (holdEvt) holdEvt.endTime = elapsed();
+
+      lpEvents++;
+      lpEventsEl.textContent = lpEvents;
+      lpRequests++;  // The response counts, but reconnect adds another request
+      lpRequestsEl.textContent = lpRequests;
+
+      // LP bandwidth: full HTTP response headers + body
+      lpBandwidth += 500 + dataJson.length + 200;  // request headers + response headers + body
+
+      lpDrawEvents.push({ time: elapsed(), type: 'response', changed: true });
+      lpWaiting = false;
+
+      log('log-lp', `LP: Event #${eventNum} delivered, now must RECONNECT`);
+
+      // Simulate reconnection delay (150-300ms)
+      const reconnectDelay = 150 + Math.random() * 150;
+      lpReconnectTimer = setTimeout(() => {
+        if (!running) return;
+        lpRequests++;
+        lpRequestsEl.textContent = lpRequests;
+        lpBandwidth += 500;  // request headers for reconnection
+
+        lpDrawEvents.push({ time: elapsed(), type: 'request' });
+
+        // Check if events arrived during reconnection
+        if (lpPendingEvents.length > 0) {
+          const pending = lpPendingEvents.shift();
+          setTimeout(() => {
+            if (!running) return;
+            lpEvents++;
+            lpEventsEl.textContent = lpEvents;
+            lpBandwidth += 200 + 100;  // response
+            lpDrawEvents.push({ time: elapsed(), type: 'response', changed: true });
+            log('log-lp', `LP: Queued event delivered, RECONNECTING AGAIN`);
+            // Must reconnect again...
+            scheduleNextLPReconnect();
+          }, 100);
+        } else {
+          // Start holding
+          lpWaiting = true;
+          lpWaitStart = Date.now();
+          lpDrawEvents.push({ time: elapsed(), type: 'hold' });
+        }
+      }, reconnectDelay);
+    } else {
+      // LP is reconnecting — queue the event
+      lpPendingEvents.push(eventData);
+      log('log-lp', `LP: Event #${eventNum} QUEUED (client is reconnecting)`);
+    }
+
+    updateBandwidth();
+  }
+
+  function scheduleNextLPReconnect() {
+    const reconnectDelay = 150 + Math.random() * 150;
+    lpReconnectTimer = setTimeout(() => {
+      if (!running) return;
+      lpRequests++;
+      lpRequestsEl.textContent = lpRequests;
+      lpBandwidth += 500;
+
+      lpDrawEvents.push({ time: elapsed(), type: 'request' });
+
+      if (lpPendingEvents.length > 0) {
+        const pending = lpPendingEvents.shift();
+        setTimeout(() => {
+          if (!running) return;
+          lpEvents++;
+          lpEventsEl.textContent = lpEvents;
+          lpBandwidth += 200 + 100;
+          lpDrawEvents.push({ time: elapsed(), type: 'response', changed: true });
+          scheduleNextLPReconnect();
+        }, 100);
+      } else {
+        lpWaiting = true;
+        lpWaitStart = Date.now();
+        lpDrawEvents.push({ time: elapsed(), type: 'hold' });
+      }
+    }, reconnectDelay);
+  }
+
+  // ---- Heartbeat timer ----
+  let heartbeatTimer = null;
+
+  function startHeartbeats() {
+    heartbeatTimer = setInterval(() => {
+      if (!running || !sseConnected) return;
+      sseHeartbeats++;
+      sseHeartbeatsEl.textContent = sseHeartbeats;
+      sseBandwidth += 14;  // ": heartbeat\n\n"
+      sseDrawEvents.push({ time: elapsed(), type: 'heartbeat' });
+
+      eventFormatEl.innerHTML = `<span class="ef-comment">: heartbeat</span>\n`;
+    }, 5000);  // 5 seconds for demo (15s would be too slow)
+  }
+
+  // ---- Start / Reset ----
+  function start() {
+    if (running) return;
+    running = true;
+    startTime = Date.now();
+
+    startBtn.disabled = true;
+    sendEventBtn.disabled = false;
+    burstBtn.disabled = false;
+
+    // SSE: establish connection (1 request)
+    sseConnected = true;
+    sseRequests = 1;
+    sseRequestsEl.textContent = 1;
+    sseBandwidth += 500 + 200;  // Initial request + response headers
+    sseStateEl.textContent = 'CONNECTED';
+    sseStateEl.className = 'conn-state-indicator';
+    sseDrawEvents.push({ time: elapsed(), type: 'connect' });
+
+    // LP: start first long poll (1 request)
+    lpRequests = 1;
+    lpRequestsEl.textContent = 1;
+    lpBandwidth += 500;  // request headers
+    lpWaiting = true;
+    lpWaitStart = Date.now();
+    lpDrawEvents.push({ time: elapsed(), type: 'request' });
+    lpDrawEvents.push({ time: elapsed(), type: 'hold' });
+
+    updateBandwidth();
+    startHeartbeats();
+    render();
+
+    log('log-system', 'Demo started. SSE connected with 1 request. LP sent first poll.');
+    log('log-system', 'Click "Send Event" or "Burst" to trigger server events.');
+  }
+
+  function reset() {
+    running = false;
+    sseConnected = false;
+    if (animFrame) cancelAnimationFrame(animFrame);
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (lpReconnectTimer) clearTimeout(lpReconnectTimer);
+
+    totalEvents = 0; eventIdCounter = 0;
+    sseEvents = 0; sseRequests = 0; sseHeartbeats = 0;
+    sseDrawEvents = []; sseBandwidth = 0;
+    lpEvents = 0; lpRequests = 0;
+    lpDrawEvents = []; lpBandwidth = 0;
+    lpWaiting = false; lpPendingEvents = [];
+
+    totalEventsEl.textContent = '0';
+    sseEventsEl.textContent = '0';
+    sseRequestsEl.textContent = '0';
+    sseHeartbeatsEl.textContent = '0';
+    lpRequestsEl.textContent = '0';
+    lpEventsEl.textContent = '0';
+    sseStateEl.textContent = 'DISCONNECTED';
+    sseStateEl.className = 'conn-state-indicator disconnected';
+
+    eventFormatEl.innerHTML = '<span class="ef-comment">: waiting for events...</span>';
+    bwBarSse.style.width = '0%';
+    bwBarLp.style.width = '0%';
+    bwValSse.textContent = '0 B';
+    bwValLp.textContent = '0 B';
+
+    startBtn.disabled = false;
+    sendEventBtn.disabled = true;
+    burstBtn.disabled = true;
+
+    if (sseCtx) sseCtx.clearRect(0, 0, sseCanvas.width, sseCanvas.height);
+    if (lpCtx) lpCtx.clearRect(0, 0, lpCanvas.width, lpCanvas.height);
+
+    eventLogEl.innerHTML = '';
+    log('log-system', 'Reset. Click "Start Demo" to begin.');
+  }
+
+  function burst() {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => dispatchEvent(), i * 200);
+    }
+  }
+
+  // ---- Bind events ----
+  startBtn.addEventListener('click', start);
+  sendEventBtn.addEventListener('click', dispatchEvent);
+  burstBtn.addEventListener('click', burst);
+  resetBtn.addEventListener('click', reset);
+
+  log('log-system', 'Ready. Click "Start Demo" to begin.');
+})();
+</script>
+</body>
+</html>
